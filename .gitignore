@@ -39,3 +39,71 @@
 
 # debug information files
 *.dwo
+
+# Build outputs
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.psess
+*.vsp
+*.vspx
+*.sap
+ipch/
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# MSIX
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+*.appxupload
+AppPackages/
+BundleArtifacts/
+
+# vcpkg
+vcpkg_installed/
+vcpkg-build/
+
+# Stale build logs
+build_output.txt
+
+# Accidental "nul" files (from misused redirection)
+/nul
+
+# Claude Code local state
+.claude/
+
+# Environment
+.env
+
+# Test results
+TestResults/
+*.trx

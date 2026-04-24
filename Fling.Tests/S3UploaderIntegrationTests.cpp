@@ -1,0 +1,195 @@
+#include "pch.h"
+#include "TestHelpers.h"
+#include "Models/FlingConfig.h"
+#include "Core/S3Uploader.h"
+
+using namespace Fling::Core;
+using namespace Fling::Models;
+
+// Integration tests require MinIO running locally
+// Run: docker compose up -d
+// Create bucket: visit http://localhost:9001, login minioadmin/minioadmin, create "fling-test"
+
+class S3UploaderIntegrationTests : public ::testing::Test
+{
+protected:
+    std::filesystem::path m_testDir;
+    FlingConfig m_config;
+
+    void SetUp() override
+    {
+        m_testDir = TestHelpers::CreateTempDirectory();
+
+        // MinIO test config
+        TestHelpers::MinioConfig minio;
+        m_config.endpoint = minio.endpoint;
+        m_config.region = minio.region;
+        m_config.bucket = minio.bucket;
+        m_config.accessKey = minio.accessKey;
+        m_config.secretKey = minio.secretKey;
+        m_config.expirySeconds = 3600;
+        m_config.usePathStyle = minio.usePathStyle;
+    }
+
+    void TearDown() override
+    {
+        TestHelpers::CleanupTempDirectory(m_testDir);
+    }
+
+    bool IsMinioRunning()
+    {
+        // Quick check if MinIO is reachable
+        S3Uploader uploader(m_config);
+        auto result = uploader.TestConnection();
+        return result.success;
+    }
+};
+
+TEST_F(S3UploaderIntegrationTests, TestConnection_Success)
+{
+    if (!IsMinioRunning())
+    {
+        GTEST_SKIP() << "MinIO not running, skipping integration test";
+    }
+
+    S3Uploader uploader(m_config);
+    auto result = uploader.TestConnection();
+
+    EXPECT_TRUE(result.success);
+}
+
+TEST_F(S3UploaderIntegrationTests, TestConnection_InvalidCredentials)
+{
+    auto badConfig = m_config;
+    badConfig.accessKey = L"invalid";
+    badConfig.secretKey = L"invalid";
+
+    S3Uploader uploader(badConfig);
+    auto result = uploader.TestConnection();
+
+    EXPECT_FALSE(result.success);
+}
+
+TEST_F(S3UploaderIntegrationTests, TestConnection_InvalidBucket)
+{
+    auto badConfig = m_config;
+    badConfig.bucket = L"nonexistent-bucket-12345";
+
+    S3Uploader uploader(badConfig);
+    auto result = uploader.TestConnection();
+
+    EXPECT_FALSE(result.success);
+}
+
+TEST_F(S3UploaderIntegrationTests, Upload_SmallFile)
+{
+    if (!IsMinioRunning())
+    {
+        GTEST_SKIP() << "MinIO not running, skipping integration test";
+    }
+
+    auto testFile = TestHelpers::CreateTestFile(m_testDir, L"small.txt", 1024);
+
+    S3Uploader uploader(m_config);
+    auto result = uploader.Upload(testFile);
+
+    EXPECT_TRUE(result.success);
+    EXPECT_FALSE(result.presignedUrl.empty());
+    EXPECT_FALSE(result.s3Key.empty());
+}
+
+TEST_F(S3UploaderIntegrationTests, Upload_WithProgressCallback)
+{
+    if (!IsMinioRunning())
+    {
+        GTEST_SKIP() << "MinIO not running, skipping integration test";
+    }
+
+    auto testFile = TestHelpers::CreateTestFile(m_testDir, L"progress.txt", 10 * 1024);
+
+    bool progressCalled = false;
+    uint64_t lastBytes = 0;
+
+    S3Uploader uploader(m_config);
+    auto result = uploader.Upload(testFile, [&](uint64_t transferred, uint64_t total)
+    {
+        progressCalled = true;
+        EXPECT_GE(transferred, lastBytes);
+        EXPECT_EQ(total, 10 * 1024);
+        lastBytes = transferred;
+    });
+
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(progressCalled);
+}
+
+TEST_F(S3UploaderIntegrationTests, Upload_NonexistentFile)
+{
+    S3Uploader uploader(m_config);
+    auto result = uploader.Upload(m_testDir / L"nonexistent.txt");
+
+    EXPECT_FALSE(result.success);
+    EXPECT_FALSE(result.errorMessage.empty());
+}
+
+TEST_F(S3UploaderIntegrationTests, GeneratePresignedUrl)
+{
+    if (!IsMinioRunning())
+    {
+        GTEST_SKIP() << "MinIO not running, skipping integration test";
+    }
+
+    // First upload a file
+    auto testFile = TestHelpers::CreateTestFile(m_testDir, L"presign.txt", 100);
+
+    S3Uploader uploader(m_config);
+    auto uploadResult = uploader.Upload(testFile);
+
+    ASSERT_TRUE(uploadResult.success);
+
+    // Generate new presigned URL
+    auto url = uploader.GeneratePresignedUrl(uploadResult.s3Key);
+
+    EXPECT_FALSE(url.empty());
+    EXPECT_NE(url.find(L"http"), std::wstring::npos);
+}
+
+TEST_F(S3UploaderIntegrationTests, PresignedUrl_ContainsExpiration)
+{
+    if (!IsMinioRunning())
+    {
+        GTEST_SKIP() << "MinIO not running, skipping integration test";
+    }
+
+    auto testFile = TestHelpers::CreateTestFile(m_testDir, L"expiry.txt", 100);
+
+    S3Uploader uploader(m_config);
+    auto result = uploader.Upload(testFile);
+
+    EXPECT_TRUE(result.success);
+    // Presigned URL should contain expiration parameters
+    EXPECT_NE(result.presignedUrl.find(L"X-Amz-Expires"), std::wstring::npos);
+}
+
+// Large file test - only run manually due to size
+TEST_F(S3UploaderIntegrationTests, DISABLED_Upload_LargeFile)
+{
+    if (!IsMinioRunning())
+    {
+        GTEST_SKIP() << "MinIO not running, skipping integration test";
+    }
+
+    // Create 150MB file
+    auto testFile = TestHelpers::CreateTestFile(m_testDir, L"large.bin", 150 * 1024 * 1024);
+
+    S3Uploader uploader(m_config);
+    auto result = uploader.Upload(testFile, [](uint64_t transferred, uint64_t total)
+    {
+        // Progress callback for monitoring
+        double percent = (static_cast<double>(transferred) / total) * 100;
+        // Could log progress here
+    });
+
+    EXPECT_TRUE(result.success);
+    EXPECT_FALSE(result.presignedUrl.empty());
+}

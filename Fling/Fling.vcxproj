@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{B5A9D64D-8B6E-4B8E-9E5F-1A2B3C4D5E6F}</ProjectGuid>
+    <RootNamespace>Fling</RootNamespace>
+    <ProjectName>Fling</ProjectName>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
+    <TargetPlatformIdentifier>Windows</TargetPlatformIdentifier>
+    <TargetFramework>native</TargetFramework>
+    <TargetFrameworkMoniker>native,Version=v0.0</TargetFrameworkMoniker>
+    <NuGetTargetMoniker>native,Version=v0.0</NuGetTargetMoniker>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <AppxPackage>false</AppxPackage>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <CppWinRTOptimized>true</CppWinRTOptimized>
+    <CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
+    <CppWinRTGenerateWindowsMetadata>true</CppWinRTGenerateWindowsMetadata>
+    <VcpkgEnabled>false</VcpkgEnabled>
+    <UseWinUI>true</UseWinUI>
+    <EnableDefaultXamlItems>true</EnableDefaultXamlItems>
+    <!-- Tell the XAML markup compiler this is a C++/WinRT project.
+         Without this it defaults to $(Language) = "C++" and emits App.xaml.g.h
+         code that bypasses App_base, making make<implementation::App>() return
+         Microsoft::UI::Xaml::Application instead of Fling::App. -->
+    <XamlLanguage>CppWinRT</XamlLanguage>
+    <!-- Pin XAML codegen output to an absolute path.
+         Without this, MarkupCompilePass writes .xaml.g.h to one location (relative
+         to ProjectDir) while CopyGeneratedXaml resolves the same relative path
+         against the MSBuild invocation CWD, ending up at a different spot. -->
+    <XamlGeneratedOutputPath>$(ProjectDir)$(IntDir)</XamlGeneratedOutputPath>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+
+  <PropertyGroup Label="UserMacros" />
+
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;USE_IMPORT_EXPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <ConformanceMode>false</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir);$(IntDir)Pages;$(IntDir)Dialogs;C:\dev\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\dev\vcpkg\installed\x64-windows\debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>WindowsApp.lib;aws-cpp-sdk-core.lib;aws-cpp-sdk-s3.lib;aws-cpp-sdk-transfer.lib;aws-crt-cpp.lib;aws-c-auth.lib;aws-c-cal.lib;aws-c-common.lib;aws-c-compression.lib;aws-c-event-stream.lib;aws-c-http.lib;aws-c-io.lib;aws-c-mqtt.lib;aws-c-s3.lib;aws-c-sdkutils.lib;aws-checksums.lib;zlibd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;USE_IMPORT_EXPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <ConformanceMode>false</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir);$(IntDir)Pages;$(IntDir)Dialogs;C:\dev\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\dev\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>WindowsApp.lib;aws-cpp-sdk-core.lib;aws-cpp-sdk-s3.lib;aws-cpp-sdk-transfer.lib;aws-crt-cpp.lib;aws-c-auth.lib;aws-c-cal.lib;aws-c-common.lib;aws-c-compression.lib;aws-c-event-stream.lib;aws-c-http.lib;aws-c-io.lib;aws-c-mqtt.lib;aws-c-s3.lib;aws-c-sdkutils.lib;aws-checksums.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="App.xaml.h" />
+    <ClInclude Include="MainWindow.xaml.h" />
+    <ClInclude Include="Core\S3Uploader.h" />
+    <ClInclude Include="Core\ConfigManager.h" />
+    <ClInclude Include="Core\HistoryManager.h" />
+    <ClInclude Include="Core\ClipboardHelper.h" />
+    <ClInclude Include="Core\ToastHelper.h" />
+    <ClInclude Include="Core\UploadCoordinator.h" />
+    <ClInclude Include="Core\SendToInstaller.h" />
+    <ClInclude Include="Models\FlingConfig.h" />
+    <ClInclude Include="Models\UploadEntry.h" />
+    <ClInclude Include="Pages\SettingsPage.xaml.h" />
+    <ClInclude Include="Pages\HistoryPage.xaml.h" />
+    <ClInclude Include="Dialogs\UploadProgressDialog.xaml.h" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="App.xaml.cpp" />
+    <ClCompile Include="MainWindow.xaml.cpp" />
+    <ClCompile Include="Core\S3Uploader.cpp" />
+    <ClCompile Include="Core\ConfigManager.cpp" />
+    <ClCompile Include="Core\HistoryManager.cpp" />
+    <ClCompile Include="Core\ClipboardHelper.cpp" />
+    <ClCompile Include="Core\ToastHelper.cpp" />
+    <ClCompile Include="Core\UploadCoordinator.cpp" />
+    <ClCompile Include="Core\SendToInstaller.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Pages\SettingsPage.xaml.cpp" />
+    <ClCompile Include="Pages\HistoryPage.xaml.cpp" />
+    <ClCompile Include="Dialogs\UploadProgressDialog.xaml.cpp" />
+    <!-- XAML-compiler-generated files that aren't auto-added by CppWinRT targets.
+         XamlTypeInfo.Impl.g.cpp has the XamlMetaDataProvider method bodies;
+         XamlTypeInfo.g.cpp and module.g.cpp provide ABI wiring. -->
+    <ClCompile Include="XamlMetaDataProvider.cpp">
+      <ObjectFileName>$(IntDir)XamlMetaDataProvider_local.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="$(IntDir)Generated Files\module.g.cpp" />
+    <ClCompile Include="$(IntDir)XamlTypeInfo.g.cpp" />
+    <ClCompile Include="$(IntDir)XamlTypeInfo.Impl.g.cpp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml">
+      <SubType>Designer</SubType>
+    </ApplicationDefinition>
+    <Page Include="MainWindow.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Pages\SettingsPage.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Pages\HistoryPage.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Dialogs\UploadProgressDialog.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Image Include="Assets\TrayIcon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Midl Include="App.idl" />
+    <Midl Include="MainWindow.idl" />
+    <Midl Include="Pages\SettingsPage.idl" />
+    <Midl Include="Pages\HistoryPage.idl" />
+    <Midl Include="Dialogs\UploadProgressDialog.idl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="$(NuGetPackageRoot)microsoft.web.webview2\1.0.2651.64\lib\Microsoft.Web.WebView2.Core.winmd">
+      <IsWinMDFile>true</IsWinMDFile>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.CppWinRT" Version="2.0.240405.15" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250108002" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742" />
+    <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="1.0.240803.1" />
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+
+  <!-- Copy vcpkg runtime DLLs (AWS SDK, zlib, etc.) next to Fling.exe so it can launch. -->
+  <Target Name="_FlingCopyVcpkgRuntime" AfterTargets="Build">
+    <PropertyGroup>
+      <_VcpkgBinDir Condition="'$(Configuration)' == 'Debug'">C:\dev\vcpkg\installed\x64-windows\debug\bin</_VcpkgBinDir>
+      <_VcpkgBinDir Condition="'$(Configuration)' != 'Debug'">C:\dev\vcpkg\installed\x64-windows\bin</_VcpkgBinDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_VcpkgDlls Include="$(_VcpkgBinDir)\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_VcpkgDlls)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Hook XAML MarkupCompilePass1/2 into the native C++ build pipeline.
+       The WindowsAppSDK Markup Compiler targets chain them off PrepareResources,
+       which is part of the managed build, not the native one. -->
+  <Target Name="_FlingRunXamlMarkupCompile"
+          BeforeTargets="ClCompile"
+          DependsOnTargets="MarkupCompilePass1;MarkupCompilePass2"
+          Condition="'@(Page)' != '' Or '@(ApplicationDefinition)' != ''" />
+</Project>

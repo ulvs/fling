@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Fling.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Fling"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer Padding="20">
+        <StackPanel Spacing="16" MaxWidth="600">
+            <TextBlock Text="S3 Configuration" Style="{StaticResource TitleTextBlockStyle}"/>
+
+            <TextBox x:Name="EndpointTextBox"
+                     Header="Endpoint URL"
+                     PlaceholderText="https://s3.amazonaws.com or http://localhost:9000"/>
+
+            <TextBox x:Name="RegionTextBox"
+                     Header="Region"
+                     PlaceholderText="us-east-1"/>
+
+            <TextBox x:Name="BucketTextBox"
+                     Header="Bucket Name"
+                     PlaceholderText="my-bucket"/>
+
+            <TextBox x:Name="AccessKeyTextBox"
+                     Header="Access Key ID"
+                     PlaceholderText="AKIAIOSFODNN7EXAMPLE"/>
+
+            <PasswordBox x:Name="SecretKeyPasswordBox"
+                         Header="Secret Access Key"
+                         PlaceholderText="Enter your secret key"/>
+
+            <NumberBox x:Name="ExpiryNumberBox"
+                       Header="Link Expiry (seconds)"
+                       Value="604800"
+                       Minimum="3600"
+                       Maximum="604800"
+                       SpinButtonPlacementMode="Inline"/>
+
+            <CheckBox x:Name="PathStyleCheckBox"
+                      Content="Use path-style addressing (required for MinIO)"/>
+
+            <TextBlock Text="Explorer Integration"
+                       Style="{StaticResource SubtitleTextBlockStyle}"
+                       Margin="0,16,0,0"/>
+
+            <ToggleSwitch x:Name="SendToToggle"
+                          Header="Add Fling to the 'Send to' menu"
+                          OffContent="Disabled"
+                          OnContent="Enabled (right-click file → Send to → Fling)"
+                          Toggled="SendToToggle_Toggled"/>
+
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0">
+                <Button x:Name="SaveButton"
+                        Content="Save"
+                        Style="{StaticResource AccentButtonStyle}"
+                        Click="SaveButton_Click"/>
+
+                <Button x:Name="TestButton"
+                        Content="Test Connection"
+                        Click="TestButton_Click"/>
+            </StackPanel>
+
+            <InfoBar x:Name="StatusInfoBar"
+                     IsOpen="False"
+                     IsClosable="True"/>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
