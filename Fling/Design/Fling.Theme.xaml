@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fling design system: WinUI 3 theme resources.
+  Source of truth: design/tokens.json (the Fling design system artifact).
+  Merge in App.xaml AFTER XamlControlsResources:
+
+    <ResourceDictionary.MergedDictionaries>
+        <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+        <ResourceDictionary Source="/Design/Fling.Theme.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+-->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ResourceDictionary.ThemeDictionaries>
+
+        <!-- ============ LIGHT ============ -->
+        <ResourceDictionary x:Key="Light">
+            <Color x:Key="FlingSurfaceColor">#FAF8F5</Color>
+            <Color x:Key="FlingSurfaceRaisedColor">#FFFFFF</Color>
+            <Color x:Key="FlingLineColor">#E6E1DA</Color>
+            <Color x:Key="FlingLineStrongColor">#8F877D</Color>
+            <Color x:Key="FlingInkColor">#1E1C1A</Color>
+            <Color x:Key="FlingInkMutedColor">#6B655E</Color>
+            <Color x:Key="FlingColor">#BD3514</Color>
+            <Color x:Key="FlingSoftColor">#FDE7DF</Color>
+            <Color x:Key="FlingOnFlingColor">#FFFFFF</Color>
+            <Color x:Key="FlingArcColor">#F2B73A</Color>
+            <Color x:Key="FlingDoneColor">#2E7D50</Color>
+            <Color x:Key="FlingOnArcColor">#1E1C1A</Color>
+
+            <SolidColorBrush x:Key="FlingSurfaceBrush" Color="{StaticResource FlingSurfaceColor}" />
+            <SolidColorBrush x:Key="FlingSurfaceRaisedBrush" Color="{StaticResource FlingSurfaceRaisedColor}" />
+            <SolidColorBrush x:Key="FlingLineBrush" Color="{StaticResource FlingLineColor}" />
+            <SolidColorBrush x:Key="FlingLineStrongBrush" Color="{StaticResource FlingLineStrongColor}" />
+            <SolidColorBrush x:Key="FlingInkBrush" Color="{StaticResource FlingInkColor}" />
+            <SolidColorBrush x:Key="FlingInkMutedBrush" Color="{StaticResource FlingInkMutedColor}" />
+            <SolidColorBrush x:Key="FlingBrush" Color="{StaticResource FlingColor}" />
+            <SolidColorBrush x:Key="FlingSoftBrush" Color="{StaticResource FlingSoftColor}" />
+            <SolidColorBrush x:Key="FlingOnFlingBrush" Color="{StaticResource FlingOnFlingColor}" />
+            <SolidColorBrush x:Key="FlingArcBrush" Color="{StaticResource FlingArcColor}" />
+            <SolidColorBrush x:Key="FlingDoneBrush" Color="{StaticResource FlingDoneColor}" />
+            <SolidColorBrush x:Key="FlingOnArcBrush" Color="{StaticResource FlingOnArcColor}" />
+
+            <!-- Recolour WinUI's accent so stock controls (AccentButton, ToggleSwitch, CheckBox,
+                 ProgressRing, focus visuals in links...) use Fling vermilion. -->
+            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#BD3514" />
+            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#BD3514" Opacity="0.9" />
+            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#BD3514" Opacity="0.8" />
+            <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#BD3514" />
+            <SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#9A2A0F" />
+            <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="#BD3514" />
+            <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#FFFFFF" />
+
+            <!-- Logo for this theme's surface (see Logos/README.md). -->
+            <SvgImageSource x:Key="FlingLogoSource" UriSource="ms-appx:///Design/Logos/fling-logo.svg" />
+        </ResourceDictionary>
+
+        <!-- ============ DARK ============ -->
+        <ResourceDictionary x:Key="Dark">
+            <Color x:Key="FlingSurfaceColor">#171615</Color>
+            <Color x:Key="FlingSurfaceRaisedColor">#211F1D</Color>
+            <Color x:Key="FlingLineColor">#34312D</Color>
+            <Color x:Key="FlingLineStrongColor">#7D766D</Color>
+            <Color x:Key="FlingInkColor">#F2EEE8</Color>
+            <Color x:Key="FlingInkMutedColor">#A8A198</Color>
+            <Color x:Key="FlingColor">#FF7A52</Color>
+            <Color x:Key="FlingSoftColor">#3D1A10</Color>
+            <Color x:Key="FlingOnFlingColor">#1E1C1A</Color>
+            <Color x:Key="FlingArcColor">#F2B73A</Color>
+            <Color x:Key="FlingDoneColor">#5CC48A</Color>
+            <Color x:Key="FlingOnArcColor">#1E1C1A</Color>
+
+            <SolidColorBrush x:Key="FlingSurfaceBrush" Color="{StaticResource FlingSurfaceColor}" />
+            <SolidColorBrush x:Key="FlingSurfaceRaisedBrush" Color="{StaticResource FlingSurfaceRaisedColor}" />
+            <SolidColorBrush x:Key="FlingLineBrush" Color="{StaticResource FlingLineColor}" />
+            <SolidColorBrush x:Key="FlingLineStrongBrush" Color="{StaticResource FlingLineStrongColor}" />
+            <SolidColorBrush x:Key="FlingInkBrush" Color="{StaticResource FlingInkColor}" />
+            <SolidColorBrush x:Key="FlingInkMutedBrush" Color="{StaticResource FlingInkMutedColor}" />
+            <SolidColorBrush x:Key="FlingBrush" Color="{StaticResource FlingColor}" />
+            <SolidColorBrush x:Key="FlingSoftBrush" Color="{StaticResource FlingSoftColor}" />
+            <SolidColorBrush x:Key="FlingOnFlingBrush" Color="{StaticResource FlingOnFlingColor}" />
+            <SolidColorBrush x:Key="FlingArcBrush" Color="{StaticResource FlingArcColor}" />
+            <SolidColorBrush x:Key="FlingDoneBrush" Color="{StaticResource FlingDoneColor}" />
+            <SolidColorBrush x:Key="FlingOnArcBrush" Color="{StaticResource FlingOnArcColor}" />
+
+            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#FF7A52" />
+            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#FF7A52" Opacity="0.9" />
+            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#FF7A52" Opacity="0.8" />
+            <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#FF7A52" />
+            <SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#FFA184" />
+            <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="#FF7A52" />
+            <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#1E1C1A" />
+
+            <SvgImageSource x:Key="FlingLogoSource" UriSource="ms-appx:///Design/Logos/fling-logo-dark.svg" />
+        </ResourceDictionary>
+
+        <!-- ============ HIGH CONTRAST ============
+             Defer to the user's system colours; never force brand colours here. -->
+        <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush x:Key="FlingSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="FlingSurfaceRaisedBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="FlingLineBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="FlingLineStrongBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="FlingInkBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="FlingInkMutedBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="FlingBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="FlingSoftBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="FlingOnFlingBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SolidColorBrush x:Key="FlingArcBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="FlingDoneBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="FlingOnArcBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+            <SvgImageSource x:Key="FlingLogoSource" UriSource="ms-appx:///Design/Logos/fling-logo-dark.svg" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- System accent palette (used where WinUI derives shades itself). -->
+    <Color x:Key="SystemAccentColor">#D9461F</Color>
+    <Color x:Key="SystemAccentColorLight1">#E85A33</Color>
+    <Color x:Key="SystemAccentColorLight2">#FF7A52</Color>
+    <Color x:Key="SystemAccentColorLight3">#FFA184</Color>
+    <Color x:Key="SystemAccentColorDark1">#BD3514</Color>
+    <Color x:Key="SystemAccentColorDark2">#9A2A0F</Color>
+    <Color x:Key="SystemAccentColorDark3">#74200B</Color>
+
+    <!-- ============ SPACING (4px base) ============ -->
+    <x:Double x:Key="FlingSpace1">4</x:Double>   <!-- icon-to-label, name-to-size -->
+    <x:Double x:Key="FlingSpace2">8</x:Double>   <!-- inside controls, between list rows -->
+    <x:Double x:Key="FlingSpace4">16</x:Double>  <!-- card/row padding, gaps between controls -->
+    <x:Double x:Key="FlingSpace6">24</x:Double>  <!-- window padding, between sections -->
+    <Thickness x:Key="FlingWindowPadding">24</Thickness>
+    <Thickness x:Key="FlingCardPadding">16,12,16,12</Thickness>
+    <Thickness x:Key="FlingButtonPadding">16,0,16,0</Thickness>
+    <Thickness x:Key="FlingButtonSmallPadding">12,0,12,0</Thickness>
+
+    <!-- ============ RADII ============ -->
+    <CornerRadius x:Key="FlingRadiusSm">4</CornerRadius>     <!-- inputs, checkboxes, progress tracks -->
+    <CornerRadius x:Key="FlingRadiusMd">10</CornerRadius>    <!-- buttons, cards, rows, drop zone -->
+    <CornerRadius x:Key="FlingRadiusFull">999</CornerRadius> <!-- status pills, device avatars -->
+
+    <!-- ============ TYPE ============ -->
+    <FontFamily x:Key="FlingSansFont">Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="FlingDisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
+    <FontFamily x:Key="FlingMonoFont">Cascadia Mono, Consolas</FontFamily>
+
+    <Style x:Key="FlingBaseTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FlingSansFont}" />
+        <Setter Property="Foreground" Value="{ThemeResource FlingInkBrush}" />
+        <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <!-- Empty-state headline in the drop zone. Once per window. -->
+    <Style x:Key="FlingDisplayTextStyle" TargetType="TextBlock" BasedOn="{StaticResource FlingBaseTextStyle}">
+        <Setter Property="FontFamily" Value="{StaticResource FlingDisplayFont}" />
+        <Setter Property="FontSize" Value="28" />
+        <Setter Property="LineHeight" Value="34" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="CharacterSpacing" Value="-20" />
+    </Style>
+    <!-- Sheet and section titles. -->
+    <Style x:Key="FlingTitleTextStyle" TargetType="TextBlock" BasedOn="{StaticResource FlingBaseTextStyle}">
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="LineHeight" Value="24" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="CharacterSpacing" Value="-10" />
+    </Style>
+    <!-- File names, messages, everything else. -->
+    <Style x:Key="FlingBodyTextStyle" TargetType="TextBlock" BasedOn="{StaticResource FlingBaseTextStyle}">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="LineHeight" Value="20" />
+    </Style>
+    <!-- Form labels, tabs. -->
+    <Style x:Key="FlingLabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource FlingBaseTextStyle}">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="LineHeight" Value="16" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <!-- Timestamps, status lines, helper text. -->
+    <Style x:Key="FlingCaptionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource FlingBaseTextStyle}">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="LineHeight" Value="16" />
+        <Setter Property="Foreground" Value="{ThemeResource FlingInkMutedBrush}" />
+    </Style>
+    <!-- Sizes, speeds, time left, share codes: tabular figures so they don't jitter. -->
+    <Style x:Key="FlingMonoTextStyle" TargetType="TextBlock" BasedOn="{StaticResource FlingBaseTextStyle}">
+        <Setter Property="FontFamily" Value="{StaticResource FlingMonoFont}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="LineHeight" Value="16" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Foreground" Value="{ThemeResource FlingInkMutedBrush}" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+    </Style>
+
+    <!-- ============ BUTTONS ============ -->
+    <!-- Primary: the one action the view is for (Send, Try again). At most one per view. -->
+    <Style x:Key="FlingPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="Padding" Value="{StaticResource FlingButtonPadding}" />
+        <Setter Property="CornerRadius" Value="{StaticResource FlingRadiusMd}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <!-- Secondary: everything else that deserves a button (Add files, Choose device). -->
+    <Style x:Key="FlingSecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="Padding" Value="{StaticResource FlingButtonPadding}" />
+        <Setter Property="CornerRadius" Value="{StaticResource FlingRadiusMd}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Background" Value="{ThemeResource FlingSurfaceRaisedBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource FlingInkBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource FlingLineStrongBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <!-- Quiet: no fill until hover. Cancel, Clear list, inline actions in rows and toasts. -->
+    <Style x:Key="FlingQuietButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="Padding" Value="{StaticResource FlingButtonPadding}" />
+        <Setter Property="CornerRadius" Value="{StaticResource FlingRadiusMd}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{ThemeResource FlingInkBrush}" />
+    </Style>
+    <!-- Small (28px) variants, for use inside rows and toasts. -->
+    <Style x:Key="FlingPrimarySmallButtonStyle" TargetType="Button" BasedOn="{StaticResource FlingPrimaryButtonStyle}">
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="Padding" Value="{StaticResource FlingButtonSmallPadding}" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style x:Key="FlingQuietSmallButtonStyle" TargetType="Button" BasedOn="{StaticResource FlingQuietButtonStyle}">
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="Padding" Value="{StaticResource FlingButtonSmallPadding}" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- ============ SURFACES ============ -->
+    <!-- Card / transfer row container. Borders, not shadows, inside the window. -->
+    <Style x:Key="FlingCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource FlingSurfaceRaisedBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource FlingLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource FlingRadiusMd}" />
+        <Setter Property="Padding" Value="{StaticResource FlingCardPadding}" />
+    </Style>
+    <!-- Round 32px badge for row status icons and device avatars. -->
+    <Style x:Key="FlingAvatarStyle" TargetType="Border">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="CornerRadius" Value="16" />
+        <Setter Property="Background" Value="{ThemeResource FlingSurfaceRaisedBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource FlingLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <!-- ============ PROGRESS ============ -->
+    <!-- Transfer progress: arc fill on a line track. The mono figures beside it carry the
+         information; the bar is the glance (arc is only 1.7:1 on the light surface). -->
+    <Style x:Key="FlingProgressBarStyle" TargetType="ProgressBar">
+        <Setter Property="Foreground" Value="{ThemeResource FlingArcBrush}" />
+        <Setter Property="Background" Value="{ThemeResource FlingLineBrush}" />
+        <Setter Property="MinHeight" Value="6" />
+        <Setter Property="Height" Value="6" />
+        <Setter Property="CornerRadius" Value="{StaticResource FlingRadiusSm}" />
+    </Style>
+</ResourceDictionary>

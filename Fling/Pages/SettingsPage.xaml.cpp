@@ -5,11 +5,12 @@
 #include "SettingsPage.g.cpp"
 #endif
 
+#include "Controls/FlingToast.xaml.h"
+#include "Core/ClipboardHelper.h"
 #include "Core/ConfigManager.h"
 #include "Core/S3Uploader.h"
-#include "Models/FlingConfig.h"
 
-#include <winrt/Microsoft.UI.Xaml.Controls.h>
+#include <cmath>
 
 using namespace winrt;
 using namespace winrt::Microsoft::UI::Xaml;
@@ -17,6 +18,11 @@ using namespace winrt::Microsoft::UI::Xaml::Controls;
 using namespace winrt::Microsoft::UI::Xaml::Navigation;
 using namespace ::Fling::Core;
 using namespace ::Fling::Models;
+
+namespace
+{
+    constexpr int kSecondsPerDay = 86400;
+}
 
 namespace winrt::Fling::implementation
 {
@@ -32,19 +38,18 @@ namespace winrt::Fling::implementation
 
     void SettingsPage::LoadConfig()
     {
-        ConfigManager cm;
-        auto config = cm.Load();
+        auto config = ConfigManager().Load();
 
         EndpointTextBox().Text(hstring(config.endpoint));
         RegionTextBox().Text(hstring(config.region));
         BucketTextBox().Text(hstring(config.bucket));
         AccessKeyTextBox().Text(hstring(config.accessKey));
         SecretKeyPasswordBox().Password(hstring(config.secretKey));
-        ExpiryNumberBox().Value(static_cast<double>(config.expirySeconds));
+        ExpiryNumberBox().Value(std::clamp(std::round(config.expirySeconds / double(kSecondsPerDay)), 1.0, 7.0));
         PathStyleCheckBox().IsChecked(config.usePathStyle);
     }
 
-    void SettingsPage::SaveConfig()
+    FlingConfig SettingsPage::ReadForm()
     {
         FlingConfig config;
         config.endpoint = std::wstring(EndpointTextBox().Text());
@@ -53,85 +58,114 @@ namespace winrt::Fling::implementation
         config.accessKey = std::wstring(AccessKeyTextBox().Text());
         config.secretKey = std::wstring(SecretKeyPasswordBox().Password());
 
-        auto expiry = ExpiryNumberBox().Value();
-        if (std::isnan(expiry) || expiry <= 0)
+        double days = ExpiryNumberBox().Value();
+        if (std::isnan(days))
         {
-            expiry = 604800;
+            days = 7;
         }
-        config.expirySeconds = static_cast<int>(expiry);
+        config.expirySeconds = static_cast<int>(std::clamp(days, 1.0, 7.0)) * kSecondsPerDay;
 
         auto checked = PathStyleCheckBox().IsChecked();
         config.usePathStyle = checked && checked.Value();
-
-        // Preserve keyPrefix — not exposed in this UI yet, carry over what's on disk.
-        ConfigManager cm;
-        auto existing = cm.Load();
-        config.keyPrefix = existing.keyPrefix;
-
-        if (!config.IsConfigured())
-        {
-            ShowStatus(false, L"Bucket, access key, and secret key are required.");
-            return;
-        }
-
-        if (cm.Save(config))
-        {
-            ShowStatus(true, L"Settings saved.");
-        }
-        else
-        {
-            ShowStatus(false, L"Failed to write config file.");
-        }
+        return config;
     }
 
     void SettingsPage::SaveButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        SaveConfig();
-    }
-
-    void SettingsPage::TestButton_Click(IInspectable const&, RoutedEventArgs const&)
-    {
-        TestConnection();
-    }
-
-    void SettingsPage::TestConnection()
-    {
-        FlingConfig config;
-        config.endpoint = std::wstring(EndpointTextBox().Text());
-        config.region = std::wstring(RegionTextBox().Text());
-        config.bucket = std::wstring(BucketTextBox().Text());
-        config.accessKey = std::wstring(AccessKeyTextBox().Text());
-        config.secretKey = std::wstring(SecretKeyPasswordBox().Password());
-        auto checked = PathStyleCheckBox().IsChecked();
-        config.usePathStyle = checked && checked.Value();
-
+        auto config = ReadForm();
         if (!config.IsConfigured())
         {
-            ShowStatus(false, L"Fill in bucket and credentials before testing.");
+            ShowStatus(Status::Problem, L"Fill in the endpoint, bucket, access key and secret key.");
             return;
         }
 
-        ShowStatus(true, L"Testing connection...");
-
-        S3Uploader uploader(config);
-        auto result = uploader.TestConnection();
-
-        if (result.success)
+        ConfigManager cm;
+        // keyPrefix isn't in the form; keep what's on disk.
+        config.keyPrefix = cm.Load().keyPrefix;
+        if (cm.Save(config))
         {
-            ShowStatus(true, L"Connected successfully.");
+            ShowStatus(Status::Ok, L"Saved.");
         }
         else
         {
-            ShowStatus(false, hstring(L"Connection failed: " + result.errorMessage));
+            ShowStatus(Status::Problem, L"Couldn't save the settings file.");
         }
     }
 
-    void SettingsPage::ShowStatus(bool success, hstring const& message)
+    fire_and_forget SettingsPage::TestButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        StatusInfoBar().Message(message);
-        StatusInfoBar().Severity(success
-            ? InfoBarSeverity::Success
-            : InfoBarSeverity::Error);
-        StatusInfoBar().IsOpen(true);
+        auto strongThis = get_strong();
+        auto config = ReadForm();
+        if (!config.IsConfigured())
+        {
+            ShowStatus(Status::Problem, L"Fill in the endpoint, bucket, access key and secret key first.");
+            co_return;
+        }
+
+        TestButton().IsEnabled(false);
+        ShowStatus(Status::Busy, L"Testing the connection\u2026");
+
+        apartment_context uiThread;
+        co_await resume_background();
+        auto result = S3Uploader(config).TestConnection();
+        co_await uiThread;
+
+        strongThis->TestButton().IsEnabled(true);
+        if (result.success)
+        {
+            strongThis->ShowStatus(Status::Ok, hstring(L"Connected to " + config.bucket + L"."));
+        }
+        else
+        {
+            strongThis->ShowStatus(Status::Problem, hstring(L"Couldn't connect. " + result.errorMessage));
+        }
+    }
+
+    void SettingsPage::RevealButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        bool reveal = SecretKeyPasswordBox().PasswordRevealMode() != PasswordRevealMode::Visible;
+        SecretKeyPasswordBox().PasswordRevealMode(reveal ? PasswordRevealMode::Visible : PasswordRevealMode::Hidden);
+        RevealButton().Content(box_value(reveal ? L"Hide" : L"Show"));
+    }
+
+    void SettingsPage::CopySecretButton_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        auto secret = std::wstring(SecretKeyPasswordBox().Password());
+        auto toast = get_self<FlingToast>(Toast());
+        if (secret.empty())
+        {
+            toast->Show(ToastTone::Alert, L"There's no secret key to copy");
+        }
+        else if (ClipboardHelper::CopyToClipboard(secret))
+        {
+            toast->Show(ToastTone::Neutral, L"Secret key copied");
+        }
+        else
+        {
+            toast->Show(ToastTone::Alert, L"Couldn't copy the secret key");
+        }
+    }
+
+    void SettingsPage::ShowStatus(Status status, hstring const& message)
+    {
+        auto resources = Application::Current().Resources();
+        auto glyph = StatusGlyph();
+        switch (status)
+        {
+        case Status::Busy:
+            glyph.Glyph(L"\uE895");
+            glyph.Foreground(resources.Lookup(box_value(L"FlingInkMutedBrush")).as<Media::Brush>());
+            break;
+        case Status::Ok:
+            glyph.Glyph(L"\uE73E");
+            glyph.Foreground(resources.Lookup(box_value(L"FlingDoneBrush")).as<Media::Brush>());
+            break;
+        case Status::Problem:
+            glyph.Glyph(L"\uE7BA");
+            glyph.Foreground(resources.Lookup(box_value(L"FlingInkBrush")).as<Media::Brush>());
+            break;
+        }
+        StatusText().Text(message);
+        StatusPanel().Visibility(Visibility::Visible);
     }
 }

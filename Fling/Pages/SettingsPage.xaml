@@ -3,59 +3,78 @@
     x:Class="Fling.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:Fling"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d">
+    xmlns:local="using:Fling">
 
-    <ScrollViewer Padding="20">
-        <StackPanel Spacing="16" MaxWidth="600">
-            <TextBlock Text="S3 Configuration" Style="{StaticResource TitleTextBlockStyle}"/>
+    <Grid>
+        <ScrollViewer>
+            <Grid Padding="{StaticResource FlingWindowPadding}">
+                <!-- Left-aligned, filling the width up to a readable maximum. -->
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MaxWidth="640"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="{StaticResource FlingSpace6}">
+                <TextBlock Text="Settings" Style="{StaticResource FlingTitleTextStyle}"/>
 
-            <TextBox x:Name="EndpointTextBox"
-                     Header="Endpoint URL"
-                     PlaceholderText="https://ACCOUNT_ID.r2.cloudflarestorage.com, https://s3.amazonaws.com, ..."/>
+                <Border Style="{StaticResource FlingCardStyle}">
+                    <StackPanel Spacing="{StaticResource FlingSpace4}">
+                        <StackPanel Spacing="{StaticResource FlingSpace1}">
+                            <TextBlock Text="Storage" Style="{StaticResource FlingLabelTextStyle}"/>
+                            <TextBlock Style="{StaticResource FlingCaptionTextStyle}"
+                                       Text="Fling uploads to S3-compatible storage you own: MinIO, Backblaze B2, Cloudflare R2 or Amazon S3."/>
+                        </StackPanel>
 
-            <TextBox x:Name="RegionTextBox"
-                     Header="Region"
-                     PlaceholderText="us-east-1 (Cloudflare R2: auto)"/>
+                        <TextBox x:Name="EndpointTextBox" Header="Endpoint"
+                                 PlaceholderText="https://s3.eu-central-003.backblazeb2.com"/>
+                        <TextBox x:Name="RegionTextBox" Header="Region"
+                                 PlaceholderText="us-east-1 (Cloudflare R2: auto)"/>
+                        <TextBox x:Name="BucketTextBox" Header="Bucket" PlaceholderText="my-bucket"/>
+                        <TextBox x:Name="AccessKeyTextBox" Header="Access key ID"/>
 
-            <TextBox x:Name="BucketTextBox"
-                     Header="Bucket Name"
-                     PlaceholderText="my-bucket"/>
+                        <Grid ColumnSpacing="{StaticResource FlingSpace2}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <PasswordBox x:Name="SecretKeyPasswordBox" Header="Secret access key"
+                                         PasswordRevealMode="Hidden"/>
+                            <Button x:Name="RevealButton" Grid.Column="1" Content="Show"
+                                    VerticalAlignment="Bottom" Style="{StaticResource FlingQuietButtonStyle}"
+                                    Click="RevealButton_Click"/>
+                            <Button Grid.Column="2" Content="Copy"
+                                    VerticalAlignment="Bottom" Style="{StaticResource FlingQuietButtonStyle}"
+                                    Click="CopySecretButton_Click"/>
+                        </Grid>
 
-            <TextBox x:Name="AccessKeyTextBox"
-                     Header="Access Key ID"
-                     PlaceholderText="AKIAIOSFODNN7EXAMPLE"/>
+                        <NumberBox x:Name="ExpiryNumberBox" Header="Links expire after (days)"
+                                   Minimum="1" Maximum="7" SmallChange="1" LargeChange="1"
+                                   SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" MinWidth="160"/>
 
-            <PasswordBox x:Name="SecretKeyPasswordBox"
-                         Header="Secret Access Key"
-                         PlaceholderText="Enter your secret key"/>
+                        <CheckBox x:Name="PathStyleCheckBox"
+                                  Content="Use path-style addressing (MinIO, Backblaze B2, Cloudflare R2)"/>
+                    </StackPanel>
+                </Border>
 
-            <NumberBox x:Name="ExpiryNumberBox"
-                       Header="Link Expiry (seconds)"
-                       Value="604800"
-                       Minimum="3600"
-                       Maximum="604800"
-                       SpinButtonPlacementMode="Inline"/>
+                <StackPanel Spacing="{StaticResource FlingSpace4}">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource FlingSpace2}">
+                        <Button x:Name="SaveButton" Content="Save"
+                                Style="{StaticResource FlingPrimaryButtonStyle}" Click="SaveButton_Click"/>
+                        <Button x:Name="TestButton" Content="Test connection"
+                                Style="{StaticResource FlingSecondaryButtonStyle}" Click="TestButton_Click"/>
+                    </StackPanel>
 
-            <CheckBox x:Name="PathStyleCheckBox"
-                      Content="Use path-style addressing (required for MinIO)"/>
+                    <StackPanel x:Name="StatusPanel" Orientation="Horizontal" Spacing="{StaticResource FlingSpace2}"
+                                Visibility="Collapsed">
+                        <FontIcon x:Name="StatusGlyph" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="StatusText" Style="{StaticResource FlingBodyTextStyle}"
+                                   VerticalAlignment="Center" MaxWidth="560"/>
+                    </StackPanel>
+                </StackPanel>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
 
-            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0">
-                <Button x:Name="SaveButton"
-                        Content="Save"
-                        Style="{StaticResource AccentButtonStyle}"
-                        Click="SaveButton_Click"/>
-
-                <Button x:Name="TestButton"
-                        Content="Test Connection"
-                        Click="TestButton_Click"/>
-            </StackPanel>
-
-            <InfoBar x:Name="StatusInfoBar"
-                     IsOpen="False"
-                     IsClosable="True"/>
-        </StackPanel>
-    </ScrollViewer>
+        <local:FlingToast x:Name="Toast"/>
+    </Grid>
 </Page>

@@ -1,0 +1,8 @@
+namespace Fling
+{
+    [default_interface]
+    runtimeclass DropZone : Microsoft.UI.Xaml.Controls.UserControl
+    {
+        DropZone();
+    }
+}

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Fling.TransferRow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Border Style="{StaticResource FlingCardStyle}">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="TransferStates">
+                <VisualState x:Name="Waiting"/>
+                <VisualState x:Name="Sending">
+                    <VisualState.Setters>
+                        <Setter Target="Avatar.Background" Value="{ThemeResource FlingArcBrush}"/>
+                        <Setter Target="Avatar.BorderThickness" Value="0"/>
+                        <Setter Target="StateGlyph.Glyph" Value="&#xE74A;"/>
+                        <Setter Target="StateGlyph.Foreground" Value="{ThemeResource FlingOnArcBrush}"/>
+                        <Setter Target="Progress.Visibility" Value="Visible"/>
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Done">
+                    <VisualState.Setters>
+                        <Setter Target="Avatar.BorderBrush" Value="{ThemeResource FlingDoneBrush}"/>
+                        <Setter Target="Avatar.BorderThickness" Value="1.5"/>
+                        <Setter Target="StateGlyph.Glyph" Value="&#xE73E;"/>
+                        <Setter Target="StateGlyph.Foreground" Value="{ThemeResource FlingDoneBrush}"/>
+                        <Setter Target="DetailText.Foreground" Value="{ThemeResource FlingDoneBrush}"/>
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Failed">
+                    <VisualState.Setters>
+                        <Setter Target="StateGlyph.Glyph" Value="&#xE7BA;"/>
+                        <Setter Target="StateGlyph.Foreground" Value="{ThemeResource FlingInkBrush}"/>
+                        <Setter Target="DetailText.Visibility" Value="Collapsed"/>
+                        <Setter Target="ReasonText.Visibility" Value="Visible"/>
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Inactive">
+                    <VisualState.Setters>
+                        <Setter Target="StateGlyph.Glyph" Value="&#xE8A5;"/>
+                        <Setter Target="NameText.Foreground" Value="{ThemeResource FlingInkMutedBrush}"/>
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
+        <Grid ColumnSpacing="{StaticResource FlingSpace4}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Border x:Name="Avatar" Style="{StaticResource FlingAvatarStyle}" VerticalAlignment="Center">
+                <FontIcon x:Name="StateGlyph" Glyph="&#xE823;" FontSize="14"
+                          Foreground="{ThemeResource FlingInkMutedBrush}"/>
+            </Border>
+
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="{StaticResource FlingSpace1}">
+                <Grid ColumnSpacing="{StaticResource FlingSpace2}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="NameText" Style="{StaticResource FlingBodyTextStyle}"
+                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="TargetText" Grid.Column="1" Style="{StaticResource FlingCaptionTextStyle}"
+                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                </Grid>
+                <ProgressBar x:Name="Progress" Style="{StaticResource FlingProgressBarStyle}"
+                             Maximum="1" Visibility="Collapsed"/>
+                <TextBlock x:Name="DetailText" Style="{StaticResource FlingMonoTextStyle}"
+                           TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="ReasonText" Style="{StaticResource FlingCaptionTextStyle}"
+                           Foreground="{ThemeResource FlingInkBrush}" MaxLines="2"
+                           TextTrimming="CharacterEllipsis" Visibility="Collapsed"/>
+            </StackPanel>
+
+            <Button x:Name="ActionButton" Grid.Column="2" VerticalAlignment="Center"
+                    Visibility="Collapsed" Click="ActionButton_Click"/>
+        </Grid>
+    </Border>
+</UserControl>

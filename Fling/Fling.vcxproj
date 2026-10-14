@@ -77,7 +77,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(GeneratedFilesDir)Pages;$(GeneratedFilesDir)Dialogs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(GeneratedFilesDir)Pages;$(GeneratedFilesDir)Controls;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -96,7 +96,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(GeneratedFilesDir)Pages;$(GeneratedFilesDir)Dialogs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(GeneratedFilesDir)Pages;$(GeneratedFilesDir)Controls;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
@@ -135,8 +135,14 @@
     <ClInclude Include="Pages\HistoryPage.xaml.h">
       <DependentUpon>Pages\HistoryPage.xaml</DependentUpon>
     </ClInclude>
-    <ClInclude Include="Dialogs\UploadProgressDialog.xaml.h">
-      <DependentUpon>Dialogs\UploadProgressDialog.xaml</DependentUpon>
+    <ClInclude Include="Controls\TransferRow.xaml.h">
+      <DependentUpon>Controls\TransferRow.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="Controls\DropZone.xaml.h">
+      <DependentUpon>Controls\DropZone.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="Controls\FlingToast.xaml.h">
+      <DependentUpon>Controls\FlingToast.xaml</DependentUpon>
     </ClInclude>
   </ItemGroup>
 
@@ -166,8 +172,14 @@
     <ClCompile Include="Pages\HistoryPage.xaml.cpp">
       <DependentUpon>Pages\HistoryPage.xaml</DependentUpon>
     </ClCompile>
-    <ClCompile Include="Dialogs\UploadProgressDialog.xaml.cpp">
-      <DependentUpon>Dialogs\UploadProgressDialog.xaml</DependentUpon>
+    <ClCompile Include="Controls\TransferRow.xaml.cpp">
+      <DependentUpon>Controls\TransferRow.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="Controls\DropZone.xaml.cpp">
+      <DependentUpon>Controls\DropZone.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="Controls\FlingToast.xaml.cpp">
+      <DependentUpon>Controls\FlingToast.xaml</DependentUpon>
     </ClCompile>
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
   </ItemGroup>
@@ -188,7 +200,16 @@
     <Page Include="Pages\HistoryPage.xaml">
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="Dialogs\UploadProgressDialog.xaml">
+    <Page Include="Controls\TransferRow.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Controls\DropZone.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Controls\FlingToast.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Design\Fling.Theme.xaml">
       <SubType>Designer</SubType>
     </Page>
   </ItemGroup>
@@ -196,6 +217,7 @@
   <ItemGroup>
     <Image Include="Assets\*.png" />
     <Image Include="Assets\*.ico" />
+    <Image Include="Design\Logos\*.svg" />
   </ItemGroup>
 
   <ItemGroup>
@@ -227,8 +249,14 @@
     <Midl Include="Pages\HistoryPage.idl">
       <DependentUpon>Pages\HistoryPage.xaml</DependentUpon>
     </Midl>
-    <Midl Include="Dialogs\UploadProgressDialog.idl">
-      <DependentUpon>Dialogs\UploadProgressDialog.xaml</DependentUpon>
+    <Midl Include="Controls\TransferRow.idl">
+      <DependentUpon>Controls\TransferRow.xaml</DependentUpon>
+    </Midl>
+    <Midl Include="Controls\DropZone.idl">
+      <DependentUpon>Controls\DropZone.xaml</DependentUpon>
+    </Midl>
+    <Midl Include="Controls\FlingToast.idl">
+      <DependentUpon>Controls\FlingToast.xaml</DependentUpon>
     </Midl>
   </ItemGroup>
 

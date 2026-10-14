@@ -1,0 +1,8 @@
+namespace Fling
+{
+    [default_interface]
+    runtimeclass FlingToast : Microsoft.UI.Xaml.Controls.UserControl
+    {
+        FlingToast();
+    }
+}

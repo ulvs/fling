@@ -16,7 +16,7 @@ namespace winrt::Fling::implementation
 
         void OnLaunched(Microsoft::UI::Xaml::LaunchActivatedEventArgs const&);
 
-        // Main window (Settings/History), created on first use. page: "settings", "history" or empty.
+        // Main window (Uploads/Settings), created on first use. page: "uploads", "settings" or empty.
         static void ShowMainWindow(hstring const& page = L"");
 
         // Compact window that uploads the given files (Explorer "Share with Fling").

@@ -6,243 +6,168 @@
 #endif
 
 #include "App.xaml.h"
-#include "Core/HistoryManager.h"
+#include "Controls/DropZone.xaml.h"
+#include "Controls/FlingToast.xaml.h"
+#include "Controls/TransferRow.xaml.h"
 #include "Core/ClipboardHelper.h"
 #include "Core/Format.h"
-#include "Core/ToastHelper.h"
-#include "Core/UploadCoordinator.h"
-
-#include <winrt/Microsoft.UI.Xaml.Controls.h>
-#include <winrt/Microsoft.UI.Xaml.Media.h>
-#include <winrt/Windows.Storage.h>
-#include <winrt/Windows.Storage.Pickers.h>
-#include <winrt/Windows.UI.h>
-#include <winrt/Windows.UI.Text.h>
-
-// IInitializeWithWindow lives in <shobjidl.h>, but including that header here
-// clashes with the CppWinRT-flavored IUnknown brought in by the WinRT headers.
-// The interface is tiny, so we declare what we need directly.
-struct __declspec(uuid("3E68D4BD-7135-4D10-8018-9FB6D9F33FA1")) IInitializeWithWindow : ::IUnknown
-{
-    virtual HRESULT __stdcall Initialize(HWND hwnd) = 0;
-};
+#include "Core/HistoryManager.h"
 
 #include <chrono>
 #include <ctime>
-#include <sstream>
 #include <iomanip>
+#include <sstream>
 
 using namespace winrt;
-using namespace winrt::Windows::Foundation;
-using namespace winrt::Windows::Foundation::Collections;
 using namespace winrt::Microsoft::UI::Xaml;
 using namespace winrt::Microsoft::UI::Xaml::Controls;
-using namespace winrt::Microsoft::UI::Xaml::Media;
 using namespace winrt::Microsoft::UI::Xaml::Navigation;
 using namespace ::Fling::Core;
 
-using ::Fling::Core::FormatSize;
-
 namespace
 {
-    std::wstring FormatDate(int64_t epochSeconds)
+    constexpr size_t kMaxRows = 100;
+
+    int64_t NowSeconds()
     {
-        if (epochSeconds <= 0) return L"—";
+        using namespace std::chrono;
+        return duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+    }
+
+    // "14:02" for today, "2026-04-23" otherwise.
+    std::wstring FormatWhen(int64_t epochSeconds)
+    {
+        if (epochSeconds <= 0)
+        {
+            return L"unknown date";
+        }
         std::time_t t = static_cast<std::time_t>(epochSeconds);
+        std::time_t now = static_cast<std::time_t>(NowSeconds());
         std::tm tm{};
+        std::tm today{};
         localtime_s(&tm, &t);
+        localtime_s(&today, &now);
         std::wostringstream os;
-        os << std::put_time(&tm, L"%Y-%m-%d %H:%M");
+        bool sameDay = tm.tm_year == today.tm_year && tm.tm_yday == today.tm_yday;
+        os << std::put_time(&tm, sameDay ? L"%H:%M" : L"%Y-%m-%d");
         return os.str();
     }
 
-    std::wstring ExpiryStatus(::Fling::Models::UploadEntry const& e)
+    std::wstring TimeLeft(int64_t expiresAt)
     {
-        if (!e.success)
-        {
-            return L"Failed";
-        }
-        if (e.IsExpired())
-        {
-            return L"Expired";
-        }
-        using namespace std::chrono;
-        auto now = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
-        auto remaining = e.expiresAt - now;
-
-        auto days = remaining / 86400;
-        auto hours = (remaining % 86400) / 3600;
-
-        std::wostringstream os;
-        if (days > 0)       os << days << L"d " << hours << L"h left";
-        else if (hours > 0) os << hours << L"h left";
-        else                os << (remaining / 60) << L"m left";
-        return os.str();
+        auto remaining = expiresAt - NowSeconds();
+        if (remaining >= 86400) return std::to_wstring(remaining / 86400) + L"d left";
+        if (remaining >= 3600) return std::to_wstring(remaining / 3600) + L"h left";
+        return std::to_wstring(std::max<int64_t>(remaining / 60, 1)) + L"m left";
     }
 }
 
 namespace winrt::Fling::implementation
 {
+    winrt::weak_ref<HistoryPage> HistoryPage::s_visible;
+
     HistoryPage::HistoryPage()
     {
         InitializeComponent();
+        get_self<DropZone>(Drop())->FilesChosen = [](std::vector<std::filesystem::path> files)
+        {
+            App::ShowSendWindow(std::move(files));
+        };
     }
 
     void HistoryPage::OnNavigatedTo(NavigationEventArgs const&)
     {
+        s_visible = get_weak();
         LoadHistory();
     }
 
-    void HistoryPage::RefreshButton_Click(IInspectable const&, RoutedEventArgs const&)
+    void HistoryPage::OnNavigatedFrom(NavigationEventArgs const&)
     {
-        LoadHistory();
+        s_visible = nullptr;
     }
 
-    fire_and_forget HistoryPage::ClearAllButton_Click(IInspectable const&, RoutedEventArgs const&)
+    void HistoryPage::RefreshVisible()
+    {
+        if (auto page = s_visible.get())
+        {
+            page->LoadHistory();
+        }
+    }
+
+    fire_and_forget HistoryPage::ClearButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         auto strongThis = get_strong();
 
         ContentDialog dialog;
-        dialog.Title(box_value(L"Clear all history?"));
-        dialog.Content(box_value(L"This will remove all upload history entries. The files in S3 are not deleted."));
-        dialog.PrimaryButtonText(L"Clear");
+        dialog.Title(box_value(L"Clear the list?"));
+        dialog.Content(box_value(L"This removes the list on this PC. Uploaded files stay in your storage, and shared links keep working until they expire."));
+        dialog.PrimaryButtonText(L"Clear list");
         dialog.CloseButtonText(L"Cancel");
         dialog.DefaultButton(ContentDialogButton::Close);
         dialog.XamlRoot(XamlRoot());
 
-        auto result = co_await dialog.ShowAsync();
-        if (result == ContentDialogResult::Primary)
+        if (co_await dialog.ShowAsync() == ContentDialogResult::Primary)
         {
             HistoryManager().ClearAll();
             strongThis->LoadHistory();
         }
     }
 
-    void HistoryPage::CopyLinkButton_Click(IInspectable const&, RoutedEventArgs const&)
-    {
-        // Unused — entries are built programmatically and wire their own click handlers.
-    }
-
-    fire_and_forget HistoryPage::ShareFileButton_Click(IInspectable const&, RoutedEventArgs const&)
-    {
-        auto strongThis = get_strong();
-
-        Windows::Storage::Pickers::FileOpenPicker picker;
-        picker.SuggestedStartLocation(Windows::Storage::Pickers::PickerLocationId::DocumentsLibrary);
-        picker.FileTypeFilter().Append(L"*");
-
-        // WinUI 3 desktop FilePickers need to be bound to a native window.
-        auto initialize = picker.as<::IInitializeWithWindow>();
-        initialize->Initialize(App::MainWindowHwnd());
-
-        auto file = co_await picker.PickSingleFileAsync();
-        if (!file)
-        {
-            co_return;
-        }
-
-        std::filesystem::path path{ std::wstring(file.Path()) };
-
-        // Move the blocking S3 upload off the UI thread so the window doesn't freeze,
-        // then resume on the original (UI) apartment to refresh the list.
-        apartment_context ui_thread;
-        co_await winrt::resume_background();
-        ::Fling::Core::UploadCoordinator::UploadAndShare(path);
-        co_await ui_thread;
-
-        strongThis->LoadHistory();
-    }
-
     void HistoryPage::LoadHistory()
     {
-        HistoryManager hm;
-        auto entries = hm.LoadEntries();
+        auto entries = HistoryManager().LoadEntries();
 
-        auto items = HistoryListView().Items();
-        items.Clear();
-
-        for (auto const& entry : entries)
+        auto rows = Rows().Children();
+        rows.Clear();
+        for (size_t i = 0; i < entries.size() && i < kMaxRows; ++i)
         {
-            items.Append(BuildEntryItem(entry));
+            rows.Append(BuildRow(entries[i]));
         }
 
-        UpdateEmptyState(entries.empty());
+        EmptyText().Visibility(entries.empty() ? Visibility::Visible : Visibility::Collapsed);
+        ClearButton().Visibility(entries.empty() ? Visibility::Collapsed : Visibility::Visible);
     }
 
-    void HistoryPage::UpdateEmptyState(bool empty)
+    winrt::Fling::TransferRow HistoryPage::BuildRow(::Fling::Models::UploadEntry const& entry)
     {
-        EmptyStateText().Visibility(empty ? Visibility::Visible : Visibility::Collapsed);
-        HistoryListView().Visibility(empty ? Visibility::Collapsed : Visibility::Visible);
-    }
+        winrt::Fling::TransferRow row;
+        auto self = get_self<TransferRow>(row);
+        self->SetFile(entry.fileName.empty() ? L"(unnamed)" : entry.fileName, {});
 
-    IInspectable HistoryPage::BuildEntryItem(::Fling::Models::UploadEntry const& entry)
-    {
-        Grid row;
-        row.Padding(ThicknessHelper::FromUniformLength(8));
-        row.ColumnSpacing(12);
+        std::wstring size = FormatSize(entry.fileSize);
+        std::wstring when = L"Uploaded " + FormatWhen(entry.uploadedAt);
 
-        ColumnDefinition nameCol; nameCol.Width(GridLengthHelper::FromValueAndType(1.0, GridUnitType::Star));
-        ColumnDefinition statusCol; statusCol.Width(GridLengthHelper::Auto());
-        ColumnDefinition buttonCol; buttonCol.Width(GridLengthHelper::Auto());
-        row.ColumnDefinitions().Append(nameCol);
-        row.ColumnDefinitions().Append(statusCol);
-        row.ColumnDefinitions().Append(buttonCol);
-
-        StackPanel info;
-        info.VerticalAlignment(VerticalAlignment::Center);
-
-        TextBlock name;
-        name.Text(hstring(entry.fileName.empty() ? L"(unnamed)" : entry.fileName));
-        name.FontWeight(Windows::UI::Text::FontWeights::SemiBold());
-        info.Children().Append(name);
-
-        TextBlock date;
-        date.Text(hstring(FormatDate(entry.uploadedAt) + L" · " + FormatSize(entry.fileSize)));
-        date.Opacity(0.7);
-        info.Children().Append(date);
-
-        if (!entry.success && !entry.errorMessage.empty())
+        if (!entry.success)
         {
-            TextBlock err;
-            err.Text(hstring(entry.errorMessage));
-            err.Opacity(0.7);
-            info.Children().Append(err);
-        }
-
-        Grid::SetColumn(info, 0);
-        row.Children().Append(info);
-
-        TextBlock status;
-        status.Text(hstring(ExpiryStatus(entry)));
-        status.VerticalAlignment(VerticalAlignment::Center);
-        if (!entry.success || entry.IsExpired())
-        {
-            status.Foreground(SolidColorBrush(Windows::UI::Colors::IndianRed()));
-        }
-        Grid::SetColumn(status, 1);
-        row.Children().Append(status);
-
-        Button copy;
-        copy.Content(box_value(L"Copy Link"));
-        copy.VerticalAlignment(VerticalAlignment::Center);
-        copy.IsEnabled(entry.success && !entry.presignedUrl.empty() && !entry.IsExpired());
-
-        std::wstring url = entry.presignedUrl;
-        std::wstring fileName = entry.fileName;
-        copy.Click([url, fileName](IInspectable const&, RoutedEventArgs const&)
-        {
-            if (ClipboardHelper::CopyToClipboard(url))
+            std::filesystem::path path(entry.filePath);
+            std::error_code ec;
+            bool canRetry = !entry.filePath.empty() && std::filesystem::is_regular_file(path, ec);
+            self->ShowFailed(L"Couldn't upload. " + entry.errorMessage, canRetry ? L"Try again" : L"");
+            self->ActionInvoked = [path]
             {
-                ToastHelper::ShowInfo(L"Link copied to clipboard");
-            }
-        });
-
-        Grid::SetColumn(copy, 2);
-        row.Children().Append(copy);
-
-        ListViewItem item;
-        item.Content(row);
-        item.HorizontalContentAlignment(HorizontalAlignment::Stretch);
-        return item;
+                App::ShowSendWindow({ path });
+            };
+        }
+        else if (entry.IsExpired())
+        {
+            self->ShowInactive(size + L" \u00B7 " + when + L" \u00B7 link expired");
+        }
+        else
+        {
+            self->ShowDone(size + L" \u00B7 " + when + L" \u00B7 " + TimeLeft(entry.expiresAt), L"Copy link");
+            self->ActionInvoked = [weak = get_weak(), url = entry.presignedUrl]
+            {
+                auto page = weak.get();
+                if (!page)
+                {
+                    return;
+                }
+                bool copied = ClipboardHelper::CopyToClipboard(url);
+                get_self<FlingToast>(page->Toast())->Show(
+                    copied ? ToastTone::Neutral : ToastTone::Alert,
+                    copied ? L"Link copied" : L"Couldn't copy the link");
+            };
+        }
+        return row;
     }
 }

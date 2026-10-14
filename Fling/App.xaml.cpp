@@ -71,7 +71,8 @@ namespace winrt::Fling::implementation
         std::wstring argText;
         if (args.Kind() == ExtendedActivationKind::Launch)
         {
-            if (auto launch = args.Data().try_as<winrt::Microsoft::UI::Xaml::LaunchActivatedEventArgs>())
+            // AppLifecycle hands over the Windows activation args, not the XAML ones.
+            if (auto launch = args.Data().try_as<winrt::Windows::ApplicationModel::Activation::ILaunchActivatedEventArgs>())
             {
                 argText = launch.Arguments();
             }

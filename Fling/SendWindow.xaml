@@ -3,69 +3,53 @@
     x:Class="Fling.SendWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d"
     Title="Fling">
 
     <Window.SystemBackdrop>
         <MicaBackdrop/>
     </Window.SystemBackdrop>
 
-    <Grid Padding="16,12,16,16" RowSpacing="6" PointerEntered="Root_PointerEntered">
+    <Grid Padding="16,8,16,16" RowSpacing="{StaticResource FlingSpace2}" PointerEntered="Root_PointerEntered">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" ColumnSpacing="4">
+        <Grid Grid.Row="0" ColumnSpacing="{StaticResource FlingSpace1}">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <FontIcon x:Name="StateIcon" Grid.Column="0" Glyph="&#xE898;" FontSize="16" Margin="0,0,6,0"/>
-            <TextBlock x:Name="TitleText" Grid.Column="1" VerticalAlignment="Center"
-                       Style="{StaticResource BodyStrongTextBlockStyle}"
-                       TextTrimming="CharacterEllipsis"/>
-            <Button x:Name="InfoButton" Grid.Column="2" Click="InfoButton_Click"
-                    Background="Transparent" BorderThickness="0" Padding="6"
-                    ToolTipService.ToolTip="Upload history"
-                    AutomationProperties.Name="Upload history">
+            <TextBlock x:Name="TitleText" Style="{StaticResource FlingLabelTextStyle}"
+                       VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+            <Button Grid.Column="1" Style="{StaticResource FlingQuietSmallButtonStyle}" Click="InfoButton_Click"
+                    ToolTipService.ToolTip="Recent uploads" AutomationProperties.Name="Recent uploads">
                 <FontIcon Glyph="&#xE946;" FontSize="14"/>
             </Button>
-            <Button x:Name="SettingsButton" Grid.Column="3" Click="SettingsButton_Click"
-                    Background="Transparent" BorderThickness="0" Padding="6"
-                    ToolTipService.ToolTip="Settings"
-                    AutomationProperties.Name="Settings">
+            <Button Grid.Column="2" Style="{StaticResource FlingQuietSmallButtonStyle}" Click="SettingsButton_Click"
+                    ToolTipService.ToolTip="Settings" AutomationProperties.Name="Settings">
                 <FontIcon Glyph="&#xE713;" FontSize="14"/>
             </Button>
         </Grid>
 
-        <TextBlock x:Name="DetailText" Grid.Row="1"
-                   Style="{StaticResource CaptionTextBlockStyle}"
-                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                   TextTrimming="CharacterEllipsis"/>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="Rows" Spacing="{StaticResource FlingSpace2}"/>
+        </ScrollViewer>
 
-        <ProgressBar x:Name="UploadProgress" Grid.Row="2" IsIndeterminate="True" Margin="0,4,0,0"/>
-
-        <TextBlock x:Name="StatusText" Grid.Row="3" TextWrapping="Wrap" MaxLines="3"
-                   TextTrimming="CharacterEllipsis"/>
-
-        <TextBlock x:Name="LinkText" Grid.Row="4" Visibility="Collapsed"
-                   Style="{StaticResource CaptionTextBlockStyle}"
-                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                   IsTextSelectionEnabled="True" TextTrimming="CharacterEllipsis"/>
-
-        <StackPanel Grid.Row="5" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-            <Button x:Name="CopyButton" Content="Copy link" Visibility="Collapsed"
-                    Style="{StaticResource AccentButtonStyle}" Click="CopyButton_Click"/>
-            <Button x:Name="CloseButton" Content="Close" Click="CloseButton_Click"/>
-        </StackPanel>
+        <Grid Grid.Row="2" ColumnSpacing="{StaticResource FlingSpace2}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusText" Style="{StaticResource FlingCaptionTextStyle}"
+                       VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+            <Button x:Name="CopyButton" Grid.Column="1" Content="Copy link" Visibility="Collapsed"
+                    Style="{StaticResource FlingSecondaryButtonStyle}" Click="CopyButton_Click"/>
+            <Button Grid.Column="2" Content="Close"
+                    Style="{StaticResource FlingQuietButtonStyle}" Click="CloseButton_Click"/>
+        </Grid>
     </Grid>
 </Window>

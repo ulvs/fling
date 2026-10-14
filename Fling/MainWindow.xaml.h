@@ -12,7 +12,7 @@ namespace winrt::Fling::implementation
             winrt::Microsoft::UI::Xaml::Controls::NavigationView const& sender,
             winrt::Microsoft::UI::Xaml::Controls::NavigationViewSelectionChangedEventArgs const& args);
 
-        // Select a navigation page by tag ("settings", "history").
+        // Select a navigation page by tag ("uploads", "settings").
         void SelectPage(winrt::hstring const& tag);
 
         // Tray icon management

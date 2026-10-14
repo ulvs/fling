@@ -1,0 +1,8 @@
+namespace Fling
+{
+    [default_interface]
+    runtimeclass TransferRow : Microsoft.UI.Xaml.Controls.UserControl
+    {
+        TransferRow();
+    }
+}

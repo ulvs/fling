@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Fling.DropZone"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    IsTabStop="True"
+    UseSystemFocusVisuals="True"
+    AllowDrop="True"
+    DragOver="Zone_DragOver"
+    DragLeave="Zone_DragLeave"
+    Drop="Zone_Drop"
+    Tapped="Zone_Tapped"
+    KeyDown="Zone_KeyDown"
+    AutomationProperties.Name="Drop files to fling, or press Enter to choose files">
+
+    <Grid MinHeight="200" Background="Transparent">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="DropStates">
+                <VisualState x:Name="Idle"/>
+                <VisualState x:Name="Over">
+                    <VisualState.Setters>
+                        <Setter Target="IdleOutline.Visibility" Value="Collapsed"/>
+                        <Setter Target="OverOutline.Visibility" Value="Visible"/>
+                        <Setter Target="Mark.Background" Value="{ThemeResource FlingBrush}"/>
+                        <Setter Target="Mark.BorderThickness" Value="0"/>
+                        <Setter Target="MarkGlyph.Foreground" Value="{ThemeResource FlingOnFlingBrush}"/>
+                        <Setter Target="MarkLift.Y" Value="-4"/>
+                        <Setter Target="Headline.Text" Value="Let go to fling"/>
+                        <Setter Target="Headline.Foreground" Value="{ThemeResource FlingBrush}"/>
+                        <Setter Target="Hint.Text" Value="Uploads start right away"/>
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
+        <Rectangle x:Name="IdleOutline" RadiusX="10" RadiusY="10"
+                   Stroke="{ThemeResource FlingLineStrongBrush}" StrokeThickness="1.5"
+                   StrokeDashArray="4,3"/>
+        <Rectangle x:Name="OverOutline" RadiusX="10" RadiusY="10" Visibility="Collapsed"
+                   Stroke="{ThemeResource FlingBrush}" StrokeThickness="2"
+                   Fill="{ThemeResource FlingSoftBrush}"/>
+
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Spacing="{StaticResource FlingSpace2}" Padding="{StaticResource FlingWindowPadding}">
+            <Border x:Name="Mark" Width="48" Height="48" HorizontalAlignment="Center"
+                    CornerRadius="{StaticResource FlingRadiusFull}"
+                    Background="{ThemeResource FlingSurfaceRaisedBrush}"
+                    BorderBrush="{ThemeResource FlingLineBrush}" BorderThickness="1"
+                    Margin="0,0,0,4">
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="MarkLift"/>
+                </Border.RenderTransform>
+                <FontIcon x:Name="MarkGlyph" Glyph="&#xE898;" FontSize="18"
+                          Foreground="{ThemeResource FlingInkBrush}"/>
+            </Border>
+            <TextBlock x:Name="Headline" Text="Drop files to fling" HorizontalAlignment="Center"
+                       Style="{StaticResource FlingDisplayTextStyle}"/>
+            <TextBlock x:Name="Hint" Text="or click to choose files" HorizontalAlignment="Center"
+                       Style="{StaticResource FlingCaptionTextStyle}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

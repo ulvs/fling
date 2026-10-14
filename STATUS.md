@@ -13,7 +13,7 @@ Plan phases (from [fling-project-plan.md](fling-project-plan.md)):
 | 1 — Project setup & vcpkg | ✅ Done |
 | 2 — Core library (ConfigManager, S3Uploader, HistoryManager, helpers) | ✅ Done |
 | 3 — Explorer integration | 🟡 MSIX package + Windows 11 "Share with Fling" context menu (`FlingShellExt.dll`) landed; release signing not done |
-| 4 — WinUI 3 app | 🟡 Main window (Settings + History) on demand; compact SendWindow for Explorer shares (progress, link, Info/Settings buttons); tray icon scaffolded but not called |
+| 4 — WinUI 3 app | 🟡 Fling design system applied (theme, logos, icons). Main window: Uploads (drop zone + recent uploads) and Settings; compact SendWindow with one TransferRow per file; tray icon scaffolded but not called |
 | 5 — Polish (multi-file, drag-drop, TransferManager, creds) | ⏳ Not started |
 
 **The end-to-end pipeline works today**: configure S3 creds in Settings → click "Share a file..." on the History page → file uploads to MinIO → presigned URL lands on clipboard → toast notification → entry appears in History.
@@ -83,8 +83,9 @@ Get-AppxPackage FlingApp.Fling | Remove-AppxPackage
 4. **Preprocessor**: `NOMINMAX;WIN32_LEAN_AND_MEAN;USE_IMPORT_EXPORT`. Without `NOMINMAX` the Windows `max`/`min` macros break aws-sdk-cpp's TransferManager.h.
 5. **Unpackaged toast notifications are broken on WinAppSDK 2.x self-contained:** `AppNotificationManager::Register()` fails loading `Microsoft.WindowsAppRuntime.Insights.Resource.dll`. App catches it and carries on (no toast). The MSIX manifest now declares the toast activator (`85332090-…`), so packaged runs should register normally — not yet verified with a real toast.
 
-6. **Launch routing:** `App::OnLaunched` / `HandleRedirectedActivation` open a `SendWindow` when the command line has files, otherwise the main window (created lazily, `App::ShowMainWindow(page)`). The process ends when the last window closes, so `SendWindow` hides instead of closing while an upload runs and reports by toast.
-7. **Sources are compiled with `/utf-8`.** Without it MSVC reads UTF-8 files as Windows-1252 and every non-ASCII literal (`·`, `…`, icon glyphs) turns into mojibake.
+6. **Single-instance hand-off:** the redirecting process runs `RedirectActivationToAsync` on a worker thread and pumps with `CoWaitForMultipleObjects` (blocking the STA deadlocks it), and the running instance reads `Windows.ApplicationModel.Activation.ILaunchActivatedEventArgs` (not the XAML type). Both were broken before 2026-10-14, so sharing while Fling was open never worked.
+7. **Launch routing:** `App::OnLaunched` / `HandleRedirectedActivation` open a `SendWindow` when the command line has files, otherwise the main window (created lazily, `App::ShowMainWindow(page)`). The process ends when the last window closes, so `SendWindow` hides instead of closing while an upload runs and reports by toast.
+8. **Sources are compiled with `/utf-8`.** Without it MSVC reads UTF-8 files as Windows-1252 and every non-ASCII literal (`·`, `…`, icon glyphs) turns into mojibake.
 ---
 
 ## Code layout
@@ -95,11 +96,12 @@ Fling/
   main.cpp                         AppInstance single-instance redirect
   MainWindow.xaml(.h/.cpp/.idl)    NavigationView + tray icon scaffolding
   SendWindow.xaml(.h/.cpp/.idl)    Small always-on-top upload window for file launches (bottom-right, auto-closes on success)
+  Controls/                        TransferRow, DropZone, FlingToast (design-system UserControls)
+  Design/                          Theme, tokens, logos, component specs (see CLAUDE.md "Design system")
   Pages/
     SettingsPage.xaml(.h/.cpp/.idl)  S3 creds + Test connection
     HistoryPage.xaml(.h/.cpp/.idl)   History list + "Share a file..." button
   Dialogs/
-    UploadProgressDialog.xaml(.h/.cpp/.idl)  Unused scaffold (superseded by SendWindow) — delete
   Core/
     ConfigManager.cpp              JSON round-trip for FlingConfig
     HistoryManager.cpp             JSON round-trip for UploadEntry[], 500-entry cap

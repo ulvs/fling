@@ -2,6 +2,7 @@
 #include "MainWindow.xaml.h"
 #include "Pages/SettingsPage.xaml.h"
 #include "Pages/HistoryPage.xaml.h"
+#include "Core/ConfigManager.h"
 
 #if __has_include("MainWindow.g.cpp")
 #include "MainWindow.g.cpp"
@@ -35,13 +36,15 @@ namespace winrt::Fling::implementation
         }
 
         Title(L"Fling");
+        AppWindow().SetIcon(L"Assets\\Fling.ico");
 
-        // Select Settings by default so the ContentFrame isn't empty on launch.
-        auto menuItems = NavView().MenuItems();
-        if (menuItems.Size() > 0)
-        {
-            NavView().SelectedItem(menuItems.GetAt(0));
-        }
+        // Mica runs under the title bar; caption buttons follow light/dark mode.
+        ExtendsContentIntoTitleBar(true);
+        SetTitleBar(AppTitleBar());
+        AppWindow().TitleBar().PreferredTheme(winrt::Microsoft::UI::Windowing::TitleBarTheme::UseDefaultAppMode);
+
+        // Until storage is set up there's nothing to upload to, so start on Settings.
+        SelectPage(::Fling::Core::ConfigManager().IsConfigured() ? L"uploads" : L"settings");
     }
 
     MainWindow::~MainWindow()
@@ -85,7 +88,7 @@ namespace winrt::Fling::implementation
         {
             frame.Navigate(xaml_typename<Fling::SettingsPage>());
         }
-        else if (tag == L"history")
+        else if (tag == L"uploads")
         {
             frame.Navigate(xaml_typename<Fling::HistoryPage>());
         }

@@ -1,5 +1,6 @@
 #pragma once
 #include "SettingsPage.g.h"
+#include "Models/FlingConfig.h"
 
 namespace winrt::Fling::implementation
 {
@@ -11,16 +12,19 @@ namespace winrt::Fling::implementation
 
         void SaveButton_Click(winrt::Windows::Foundation::IInspectable const& sender,
                               winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e);
-
-        void TestButton_Click(winrt::Windows::Foundation::IInspectable const& sender,
-                              winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e);
-
+        winrt::fire_and_forget TestButton_Click(winrt::Windows::Foundation::IInspectable const& sender,
+                                                winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e);
+        void RevealButton_Click(winrt::Windows::Foundation::IInspectable const& sender,
+                                winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e);
+        void CopySecretButton_Click(winrt::Windows::Foundation::IInspectable const& sender,
+                                    winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e);
 
     private:
+        enum class Status { Busy, Ok, Problem };
+
         void LoadConfig();
-        void SaveConfig();
-        void TestConnection();
-        void ShowStatus(bool success, winrt::hstring const& message);
+        ::Fling::Models::FlingConfig ReadForm();
+        void ShowStatus(Status status, winrt::hstring const& message);
     };
 }
 

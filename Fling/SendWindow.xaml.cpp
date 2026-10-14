@@ -6,28 +6,65 @@
 #endif
 
 #include "App.xaml.h"
+#include "Controls/TransferRow.xaml.h"
 #include "Core/ClipboardHelper.h"
+#include "Core/ConfigManager.h"
 #include "Core/Format.h"
 #include "Core/ToastHelper.h"
 #include "Core/UploadCoordinator.h"
+#include "Pages/HistoryPage.xaml.h"
 
 #include <atomic>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
 #include <memory>
+#include <sstream>
 
 using namespace winrt;
 using namespace winrt::Microsoft::UI::Windowing;
 using namespace winrt::Microsoft::UI::Xaml;
-using namespace winrt::Microsoft::UI::Xaml::Controls;
 using namespace std::chrono_literals;
 
 namespace
 {
-    constexpr int kWidthDip = 420;
-    constexpr int kHeightDip = 220;
+    constexpr int kWidthDip = 440;
+    constexpr int kChromeHeightDip = 150;  // title bar, header, footer and padding
+    constexpr int kRowHeightDip = 88;
+    constexpr size_t kMaxVisibleRows = 3;
     constexpr int kMarginDip = 16;
+    constexpr wchar_t kSep[] = L" \u00B7 ";
 
-    constexpr wchar_t kGlyphDone[] = L"\uE73E";
-    constexpr wchar_t kGlyphError[] = L"\uE783";
+    std::wstring FormatDuration(double seconds)
+    {
+        auto total = static_cast<long long>(seconds + 0.5);
+        std::wostringstream os;
+        if (total >= 3600)
+        {
+            os << total / 3600 << L':' << std::setw(2) << std::setfill(L'0') << (total % 3600) / 60 << L':';
+        }
+        else
+        {
+            os << total / 60 << L':';
+        }
+        os << std::setw(2) << std::setfill(L'0') << total % 60;
+        return os.str();
+    }
+
+    std::wstring TimeOfDay()
+    {
+        std::time_t now = std::time(nullptr);
+        std::tm tm{};
+        localtime_s(&tm, &now);
+        std::wostringstream os;
+        os << std::put_time(&tm, L"%H:%M");
+        return os.str();
+    }
+
+    std::wstring Count(size_t n, wchar_t const* one, wchar_t const* many)
+    {
+        return std::to_wstring(n) + L" " + (n == 1 ? one : many);
+    }
 }
 
 namespace winrt::Fling::implementation
@@ -38,6 +75,7 @@ namespace winrt::Fling::implementation
 
         auto appWindow = AppWindow();
         appWindow.SetIcon(L"Assets\\Fling.ico");
+        appWindow.TitleBar().PreferredTheme(TitleBarTheme::UseDefaultAppMode);
         if (auto presenter = appWindow.Presenter().try_as<OverlappedPresenter>())
         {
             presenter.IsResizable(false);
@@ -50,18 +88,16 @@ namespace winrt::Fling::implementation
         // instead and report the result as a toast when the upload finishes.
         appWindow.Closing([weak = get_weak()](auto const& sender, AppWindowClosingEventArgs const& args)
         {
-            if (auto self = weak.get(); self && self->m_uploading)
+            if (auto self = weak.get(); self && self->m_active > 0)
             {
                 args.Cancel(true);
                 self->m_dismissed = true;
                 sender.Hide();
             }
         });
-
-        PlaceInCorner();
     }
 
-    void SendWindow::PlaceInCorner()
+    void SendWindow::PlaceInCorner(size_t rowCount)
     {
         auto appWindow = AppWindow();
         HWND hwnd = winrt::Microsoft::UI::GetWindowFromWindowId(appWindow.Id());
@@ -71,122 +107,166 @@ namespace winrt::Fling::implementation
         GetCursorPos(&cursor);
         auto area = DisplayArea::GetFromPoint({ cursor.x, cursor.y }, DisplayAreaFallback::Primary).WorkArea();
 
+        int heightDip = kChromeHeightDip + static_cast<int>(std::min(rowCount, kMaxVisibleRows)) * kRowHeightDip;
         int width = static_cast<int>(kWidthDip * scale);
-        int height = static_cast<int>(kHeightDip * scale);
+        int height = static_cast<int>(heightDip * scale);
         int margin = static_cast<int>(kMarginDip * scale);
         appWindow.MoveAndResize({ area.X + area.Width - width - margin, area.Y + area.Height - height - margin, width, height });
     }
 
     void SendWindow::Start(std::vector<std::filesystem::path> files)
     {
+        auto bucket = ::Fling::Core::ConfigManager().Load().bucket;
+
+        for (size_t i = 0; i < files.size(); ++i)
+        {
+            Job job;
+            job.path = files[i];
+            std::error_code ec;
+            job.size = std::filesystem::file_size(job.path, ec);
+
+            job.row = winrt::Fling::TransferRow();
+            auto row = get_self<TransferRow>(job.row);
+            row->SetFile(job.path.filename().wstring(), bucket);
+            row->ShowWaiting(::Fling::Core::FormatSize(job.size) + kSep + L"Waiting");
+            row->ActionInvoked = [weak = get_weak(), i]
+            {
+                if (auto self = weak.get())
+                {
+                    self->Retry(i);
+                }
+            };
+            Rows().Children().Append(job.row);
+            m_jobs.push_back(std::move(job));
+        }
+
+        TitleText().Text(hstring(L"Uploading " + Count(m_jobs.size(), L"file", L"files")));
+        PlaceInCorner(m_jobs.size());
         Activate();
-        RunUploads(std::move(files));
+        RunAll();
     }
 
-    winrt::fire_and_forget SendWindow::RunUploads(std::vector<std::filesystem::path> files)
+    winrt::Windows::Foundation::IAsyncAction SendWindow::RunJob(size_t index)
     {
         auto strongThis = get_strong();
         apartment_context uiThread;
         auto dispatcher = DispatcherQueue();
-        m_uploading = true;
 
-        std::vector<std::wstring> urls;
-        std::vector<std::wstring> errors;
-        size_t const total = files.size();
-
-        TitleText().Text(total == 1 ? hstring(files[0].filename().wstring()) : hstring(std::to_wstring(total) + L" files"));
-
-        for (size_t i = 0; i < total; ++i)
+        ++m_active;
+        if (m_autoCloseTimer)
         {
-            auto const& file = files[i];
-            std::error_code ec;
-            auto size = std::filesystem::file_size(file, ec);
-            std::wstring detail = ec ? std::wstring() : ::Fling::Core::FormatSize(size);
-            if (total > 1)
-            {
-                detail = file.filename().wstring() + L" (" + std::to_wstring(i + 1) + L" of " + std::to_wstring(total) + L")"
-                    + (detail.empty() ? L"" : L" \u00B7 " + detail);
-            }
-            DetailText().Text(hstring(detail));
-            StatusText().Text(L"Uploading\u2026");
+            m_autoCloseTimer.Stop();
+        }
+        auto path = m_jobs[index].path;
+        auto sizeText = ::Fling::Core::FormatSize(m_jobs[index].size);
+        get_self<TransferRow>(m_jobs[index].row)->ShowSending(0.0, sizeText + kSep + L"0%");
+        StatusText().Text(L"Uploading\u2026");
 
-            // Progress arrives on SDK threads; only marshal whole-percent changes to the UI.
-            auto lastPercent = std::make_shared<std::atomic<int>>(-1);
-            auto progress = [weak = get_weak(), dispatcher, lastPercent, i, total](uint64_t sent, uint64_t length)
+        // Progress arrives on SDK threads; only marshal whole-percent changes to the UI.
+        auto lastPercent = std::make_shared<std::atomic<int>>(-1);
+        auto started = std::chrono::steady_clock::now();
+        auto progress = [weak = get_weak(), dispatcher, lastPercent, started, index, sizeText](uint64_t sent, uint64_t total)
+        {
+            if (total == 0)
             {
-                if (length == 0)
+                return;
+            }
+            double fraction = static_cast<double>(sent) / static_cast<double>(total);
+            int percent = static_cast<int>(fraction * 100.0);
+            if (lastPercent->exchange(percent) == percent)
+            {
+                return;
+            }
+
+            std::wstring detail = sizeText + kSep + std::to_wstring(percent) + L"%";
+            double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+            if (elapsed > 0.5 && sent > 0)
+            {
+                double speed = sent / elapsed;
+                detail += kSep + ::Fling::Core::FormatSize(static_cast<uint64_t>(speed)) + L"/s"
+                    + kSep + FormatDuration((total - sent) / speed) + L" left";
+            }
+
+            dispatcher.TryEnqueue([weak, index, fraction, detail]
+            {
+                if (auto self = weak.get(); self && self->m_jobs[index].row)
                 {
-                    return;
+                    get_self<TransferRow>(self->m_jobs[index].row)->ShowSending(fraction, detail);
                 }
-                double fileFraction = static_cast<double>(sent) / static_cast<double>(length);
-                double overall = (static_cast<double>(i) + fileFraction) / static_cast<double>(total);
-                int percent = static_cast<int>(overall * 100.0);
-                if (lastPercent->exchange(percent) == percent)
-                {
-                    return;
-                }
-                dispatcher.TryEnqueue([weak, overall]
-                {
-                    if (auto self = weak.get())
-                    {
-                        self->SetProgress(overall);
-                    }
-                });
-            };
+            });
+        };
 
-            co_await winrt::resume_background();
-            auto outcome = ::Fling::Core::UploadCoordinator::Upload(file, progress);
-            co_await uiThread;
+        co_await resume_background();
+        auto outcome = ::Fling::Core::UploadCoordinator::Upload(path, progress);
+        co_await uiThread;
 
-            if (outcome.success)
-            {
-                urls.push_back(outcome.url);
-            }
-            else
-            {
-                errors.push_back(total > 1 ? file.filename().wstring() + L": " + outcome.errorMessage : outcome.errorMessage);
-            }
-        }
-
-        m_uploading = false;
-        ShowResult(total, urls, errors);
-    }
-
-    void SendWindow::SetProgress(double fraction)
-    {
-        if (m_uploading)
+        --m_active;
+        auto& job = m_jobs[index];
+        auto row = get_self<TransferRow>(job.row);
+        job.succeeded = outcome.success;
+        if (outcome.success)
         {
-            UploadProgress().IsIndeterminate(false);
-            UploadProgress().Value(fraction * 100.0);
-            StatusText().Text(hstring(L"Uploading\u2026 " + std::to_wstring(static_cast<int>(fraction * 100.0)) + L"%"));
-        }
-    }
-
-    void SendWindow::ShowResult(size_t total, std::vector<std::wstring> const& urls, std::vector<std::wstring> const& errors)
-    {
-        for (auto const& url : urls)
-        {
-            m_links += (m_links.empty() ? L"" : L"\r\n") + url;
-        }
-        bool copied = !m_links.empty() && ::Fling::Core::ClipboardHelper::CopyToClipboard(m_links);
-
-        std::wstring summary;
-        if (errors.empty())
-        {
-            summary = urls.size() == 1 ? L"Link copied to clipboard" : std::to_wstring(urls.size()) + L" links copied to clipboard";
-            if (!copied)
-            {
-                summary = L"Uploaded, but the link could not be copied to the clipboard";
-            }
-        }
-        else if (urls.empty())
-        {
-            summary = total == 1 ? L"Upload failed: " + errors[0] : L"All uploads failed. " + errors[0];
+            job.url = outcome.url;
+            job.error.clear();
+            row->ShowDone(sizeText + kSep + L"Uploaded " + TimeOfDay());
         }
         else
         {
-            summary = std::to_wstring(urls.size()) + L" of " + std::to_wstring(total) + L" uploaded, links copied. " + errors[0];
+            job.error = outcome.errorMessage;
+            row->ShowFailed(L"Couldn't upload. " + outcome.errorMessage);
         }
+    }
+
+    winrt::fire_and_forget SendWindow::RunAll()
+    {
+        auto strongThis = get_strong();
+        for (size_t i = 0; i < m_jobs.size(); ++i)
+        {
+            co_await RunJob(i);
+        }
+        Finish();
+    }
+
+    winrt::fire_and_forget SendWindow::Retry(size_t index)
+    {
+        auto strongThis = get_strong();
+        co_await RunJob(index);
+        Finish();
+    }
+
+    void SendWindow::Finish()
+    {
+        if (m_active > 0)
+        {
+            return;
+        }
+
+        m_links.clear();
+        size_t ok = 0;
+        for (auto const& job : m_jobs)
+        {
+            if (job.succeeded)
+            {
+                m_links += (m_links.empty() ? L"" : L"\r\n") + job.url;
+                ++ok;
+            }
+        }
+        size_t total = m_jobs.size();
+        size_t failed = total - ok;
+        bool copied = ok > 0 && ::Fling::Core::ClipboardHelper::CopyToClipboard(m_links);
+
+        std::wstring summary;
+        if (ok > 0)
+        {
+            summary = copied ? (ok == 1 ? L"Link copied" : std::to_wstring(ok) + L" links copied")
+                             : L"Uploaded, but the clipboard was busy. Use Copy link";
+        }
+        if (failed > 0)
+        {
+            summary += (summary.empty() ? L"" : kSep) + Count(failed, L"file", L"files") + L" didn't upload";
+        }
+
+        HistoryPage::RefreshVisible();
 
         if (m_dismissed)
         {
@@ -195,34 +275,28 @@ namespace winrt::Fling::implementation
             return;
         }
 
-        UploadProgress().IsIndeterminate(false);
-        UploadProgress().Value(100.0);
-        UploadProgress().ShowError(!errors.empty());
-        StateIcon().Glyph(errors.empty() ? kGlyphDone : kGlyphError);
-        auto brushKey = box_value(errors.empty() ? L"SystemFillColorSuccessBrush" : L"SystemFillColorCriticalBrush");
-        StateIcon().Foreground(Application::Current().Resources().Lookup(brushKey).as<Media::Brush>());
+        TitleText().Text(hstring(failed == 0
+            ? L"Uploaded " + Count(total, L"file", L"files")
+            : L"Couldn't upload " + Count(failed, L"file", L"files")));
         StatusText().Text(hstring(summary));
+        CopyButton().Visibility(ok > 0 ? Visibility::Visible : Visibility::Collapsed);
+        CopyButton().Content(box_value(ok == 1 ? L"Copy link" : L"Copy links"));
 
-        if (!urls.empty())
+        if (failed == 0)
         {
-            LinkText().Text(hstring(urls.size() == 1 ? urls[0] : urls.back()));
-            LinkText().Visibility(Visibility::Visible);
-            CopyButton().Visibility(Visibility::Visible);
-            CopyButton().Content(box_value(urls.size() == 1 ? L"Copy link" : L"Copy links"));
-        }
-
-        if (errors.empty())
-        {
-            m_autoCloseTimer = DispatcherQueue().CreateTimer();
-            m_autoCloseTimer.Interval(6s);
-            m_autoCloseTimer.IsRepeating(false);
-            m_autoCloseTimer.Tick([weak = get_weak()](auto&&, auto&&)
+            if (!m_autoCloseTimer)
             {
-                if (auto self = weak.get())
+                m_autoCloseTimer = DispatcherQueue().CreateTimer();
+                m_autoCloseTimer.Interval(6s);
+                m_autoCloseTimer.IsRepeating(false);
+                m_autoCloseTimer.Tick([weak = get_weak()](auto&&, auto&&)
                 {
-                    self->Close();
-                }
-            });
+                    if (auto self = weak.get())
+                    {
+                        self->Close();
+                    }
+                });
+            }
             m_autoCloseTimer.Start();
         }
     }
@@ -237,7 +311,7 @@ namespace winrt::Fling::implementation
 
     void SendWindow::InfoButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
-        App::ShowMainWindow(L"history");
+        App::ShowMainWindow(L"uploads");
     }
 
     void SendWindow::SettingsButton_Click(IInspectable const&, RoutedEventArgs const&)
@@ -249,14 +323,14 @@ namespace winrt::Fling::implementation
     {
         if (::Fling::Core::ClipboardHelper::CopyToClipboard(m_links))
         {
-            StatusText().Text(L"Copied to clipboard");
+            StatusText().Text(L"Copied to the clipboard");
         }
     }
 
     void SendWindow::CloseButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         // Window::Close() doesn't raise AppWindow.Closing, so apply the same keep-uploading rule here.
-        if (m_uploading)
+        if (m_active > 0)
         {
             m_dismissed = true;
             AppWindow().Hide();

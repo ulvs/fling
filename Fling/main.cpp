@@ -3,6 +3,8 @@
 #include <winrt/Microsoft.Windows.AppLifecycle.h>
 #include "App.xaml.h"
 
+#include <thread>
+
 using namespace winrt::Microsoft::Windows::AppLifecycle;
 
 int WINAPI wWinMain(
@@ -24,7 +26,21 @@ int WINAPI wWinMain(
         // Explorer gave this process foreground rights; pass them on so the running
         // instance's send window comes to the front instead of flashing in the taskbar.
         AllowSetForegroundWindow(ASFW_ANY);
-        keyInstance.RedirectActivationToAsync(activationArgs).get();
+
+        // Blocking this STA on the redirect deadlocks it (the call needs the apartment to pump),
+        // so redirect on a worker thread and pump here until it completes.
+        HANDLE redirected = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        std::thread worker([&]
+        {
+            winrt::init_apartment();
+            keyInstance.RedirectActivationToAsync(activationArgs).get();
+            SetEvent(redirected);
+            winrt::uninit_apartment();
+        });
+        DWORD signaled = 0;
+        CoWaitForMultipleObjects(CWMO_DEFAULT, INFINITE, 1, &redirected, &signaled);
+        worker.join();
+        CloseHandle(redirected);
         return 0;
     }
 
