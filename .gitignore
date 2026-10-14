@@ -110,3 +110,6 @@ TestResults/
 
 # C++/WinRT + XAML compiler output
 **/Generated Files/
+
+# Sideload packages
+dist/
