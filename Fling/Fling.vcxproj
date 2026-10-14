@@ -25,10 +25,8 @@
     <TargetFrameworkMoniker>native,Version=v0.0</TargetFrameworkMoniker>
     <NuGetTargetMoniker>native,Version=v0.0</NuGetTargetMoniker>
     <ResolveNuGetPackages>false</ResolveNuGetPackages>
-    <WindowsPackageType>None</WindowsPackageType>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <AppxPackage>false</AppxPackage>
-    <EnableMsixTooling>false</EnableMsixTooling>
+    <AppxPackage>true</AppxPackage>
+    <EnableMsixTooling>true</EnableMsixTooling>
     <CppWinRTOptimized>true</CppWinRTOptimized>
     <CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
     <CppWinRTGenerateWindowsMetadata>true</CppWinRTGenerateWindowsMetadata>
@@ -188,7 +186,35 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Image Include="Assets\TrayIcon.ico" />
+    <Image Include="Assets\*.png" />
+    <Image Include="Assets\*.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest">
+      <SubType>Designer</SubType>
+    </AppxManifest>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <_FlingVcpkgBin Condition="'$(Configuration)' == 'Debug'">C:\dev\vcpkg\installed\x64-windows\debug\bin</_FlingVcpkgBin>
+    <_FlingVcpkgBin Condition="'$(Configuration)' != 'Debug'">C:\dev\vcpkg\installed\x64-windows\bin</_FlingVcpkgBin>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(_FlingVcpkgBin)\*.dll" Exclude="$(_FlingVcpkgBin)\gtest*.dll;$(_FlingVcpkgBin)\gmock*.dll">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\FlingShellExt\$(Platform)\$(Configuration)\FlingShellExt.dll">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>FlingShellExt.dll</Link>
+    </None>
+    <ProjectReference Include="..\FlingShellExt\FlingShellExt.vcxproj">
+      <Project>{C0841E4F-C65D-470E-A9A8-8F2A43837CEB}</Project>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -223,18 +249,13 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 
-  <!-- Copy vcpkg runtime DLLs (AWS SDK, zlib, etc.) next to Fling.exe so it can launch. -->
-  <Target Name="_FlingCopyVcpkgRuntime" AfterTargets="Build">
-    <PropertyGroup>
-      <_VcpkgBinDir Condition="'$(Configuration)' == 'Debug'">C:\dev\vcpkg\installed\x64-windows\debug\bin</_VcpkgBinDir>
-      <_VcpkgBinDir Condition="'$(Configuration)' != 'Debug'">C:\dev\vcpkg\installed\x64-windows\bin</_VcpkgBinDir>
-    </PropertyGroup>
+  <!-- WebView2's winmd reference implies lib\Microsoft.Web.WebView2.Core.dll, which doesn't exist;
+       the real x64 binary comes from runtimes\win-x64\native_uap. Without this, packaging fails with APPX1101. -->
+  <Target Name="_FlingDropPhantomWebView2Payload" BeforeTargets="_ComputeAppxPackagePayload">
     <ItemGroup>
-      <_VcpkgDlls Include="$(_VcpkgBinDir)\*.dll" />
+      <PackagingOutputs Remove="@(PackagingOutputs)"
+                        Condition="'%(Filename)%(Extension)' == 'Microsoft.Web.WebView2.Core.dll' And !Exists('%(FullPath)')" />
     </ItemGroup>
-    <Copy SourceFiles="@(_VcpkgDlls)"
-          DestinationFolder="$(OutDir)"
-          SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

@@ -12,7 +12,7 @@ Plan phases (from [fling-project-plan.md](fling-project-plan.md)):
 |---|---|
 | 1 — Project setup & vcpkg | ✅ Done |
 | 2 — Core library (ConfigManager, S3Uploader, HistoryManager, helpers) | ✅ Done |
-| 3 — Explorer integration | 🟡 SendTo approach landed; MSIX context menu not started |
+| 3 — Explorer integration | 🟡 MSIX package + Windows 11 "Share with Fling" context menu (`FlingShellExt.dll`) landed; release signing not done |
 | 4 — WinUI 3 tray app | 🟡 Window + Settings + History wired; tray icon scaffolded but not called |
 | 5 — Polish (multi-file, drag-drop, TransferManager, creds) | ⏳ Not started |
 
@@ -50,13 +50,37 @@ Post-build steps copy vcpkg `x64-windows\[debug\]bin\*.dll` next to both exes.
 
 ---
 
+## MSIX (packaged) dev loop
+
+Fling is a full MSIX app (`AppxPackage=true`, framework-dependent on `Microsoft.WindowsAppRuntime.2` ≥ 2.5.1). Identity `FlingApp.Fling`, publisher `CN=FlingApp`.
+
+```
+# Build the layout (Release: the Debug layout needs the VCLibs *Debug* frameworks, which only VS F5 deploys)
+"...\MSBuild.exe" Fling.sln -restore -p:Configuration=Release -p:Platform=x64
+
+# Register the unsigned layout for the current user (needs Developer Mode)
+Add-AppxPackage -Register E:\dev\fling\x64\Release\Fling\AppxManifest.xml   # sln build
+Add-AppxPackage -Register E:\dev\fling\Fling\x64\Release\Fling\AppxManifest.xml   # project build
+
+# Launch with identity / uninstall
+fling.exe            # app execution alias
+Get-AppxPackage FlingApp.Fling | Remove-AppxPackage
+```
+
+- **`FlingShellExt/`** — in-proc `IExplorerCommand` DLL (WRL, static CRT, no WinAppSDK) registered via `windows.fileExplorerContextMenus` + `com:SurrogateServer`. `Invoke` launches the `fling.exe` alias with the selected paths so Fling runs with package identity; the existing single-instance redirect handles the upload. Packaged into Fling's layout via a `<None DeploymentContent>` item; its OutDir is pinned so .sln and project builds agree.
+- **vcpkg DLLs** are package content via a wildcard `<None DeploymentContent>` item (gtest/gmock excluded).
+- **`_FlingDropPhantomWebView2Payload`** target: WebView2's winmd reference implies a non-existent `lib\Microsoft.Web.WebView2.Core.dll`, which collides with the real `native_uap` one (APPX1101).
+- **AppData is virtualized** for the packaged app: new writes to `%LOCALAPPDATA%\Fling` / `%APPDATA%\...\SendTo` land under `%LOCALAPPDATA%\Packages\FlingApp.Fling_*\LocalCache`. The SendTo toggle is therefore likely broken when packaged (and redundant with the context menu).
+
+---
+
 ## Key implementation notes
 
 1. **No `App.idl`.** As in the WinUI template, `App` is not a WinRT runtime class; `App.xaml.h` includes the XAML compiler's `App.xaml.g.h`.
 2. Page `.xaml.cpp` files must **not** include `*.xaml.g.hpp` — those are produced by markup pass 2 after the main compile and are pulled in by `XamlTypeInfo.g.cpp`.
 3. Generated code lives in `Fling\Generated Files\` (git-ignored); `Generated Files\Pages` and `\Dialogs` are on the include path so `X.g.h` can find `X.xaml.g.h`.
 4. **Preprocessor**: `NOMINMAX;WIN32_LEAN_AND_MEAN;USE_IMPORT_EXPORT`. Without `NOMINMAX` the Windows `max`/`min` macros break aws-sdk-cpp's TransferManager.h.
-5. **Unpackaged toast notifications are broken on WinAppSDK 2.x self-contained:** `AppNotificationManager::Register()` fails loading `Microsoft.WindowsAppRuntime.Insights.Resource.dll`. App catches it and carries on (no toast). Expected to be fixed by moving to MSIX.
+5. **Unpackaged toast notifications are broken on WinAppSDK 2.x self-contained:** `AppNotificationManager::Register()` fails loading `Microsoft.WindowsAppRuntime.Insights.Resource.dll`. App catches it and carries on (no toast). The MSIX manifest now declares the toast activator (`85332090-…`), so packaged runs should register normally — not yet verified with a real toast.
 
 ---
 
@@ -92,17 +116,12 @@ Tests in `Fling.Tests/` — gtest 1.17 from vcpkg; compiles `Core/ConfigManager`
 
 ## Known TODOs (by priority)
 
-### Immediate (to prove SendTo works)
-- Toggle "Add Fling to the 'Send to' menu" on the Settings page with a real file on the destination machine; right-click → Send to → Fling → verify URL lands on clipboard. Single-instance redirect is in place, so subsequent Send-Tos reuse the running app.
-
-### MSIX packaging (next big task, user asked for this)
-- This is Phase 3 proper. Required for **top-level** Windows 11 context menu integration (`IExplorerCommand` registration via `Package.appxmanifest`'s `desktop4:FileExplorerContextMenus` extension).
-- Scope:
-  - Flip the vcxproj from `<WindowsPackageType>None</WindowsPackageType>` to a packaged configuration. Current project is an unpackaged WinUI 3 app.
-  - Fill out `Package.appxmanifest` identity (Publisher needs to match the code-signing cert), capabilities, and the context-menu extension.
-  - Create a self-signed dev cert, sign the package, install via `Add-AppxPackage -Register`.
-  - Possibly implement an `IExplorerCommand` COM class (lightweight shell extension) or use the Verb/Clsid delegation approach to invoke `Fling.exe "%1"` directly.
-  - Existing `App::ProcessFilePath` / `AppInstance` redirect code will keep working under MSIX — the new piece is the shell integration declaration.
+### Next
+- Verify end to end with the packaged app: right-click a file → "Share with Fling" → URL on clipboard + toast + History entry. Check Settings shows the pre-MSIX config (AppData virtualization).
+- Decide the SendTo toggle's fate under MSIX (likely remove — the context menu replaces it).
+- Release signing: self-signed `CN=FlingApp` is fine for local installs, but GitHub Releases users would have to trust the cert manually. Options: a real code-signing cert (e.g. Azure Trusted Signing) or Store-only distribution (the Store re-signs).
+- Remove hard-coded `C:\dev\vcpkg` paths (manifest mode) before open-sourcing.
+- `S3Uploader` sets no connect timeout: "Test connection" against an unreachable endpoint hangs ~70 s.
 
 ### Phase 4 polish
 - `MainWindow::SetupTrayIcon()` exists but is never called from the constructor; wire it up so the tray icon actually appears.
@@ -119,6 +138,5 @@ Tests in `Fling.Tests/` — gtest 1.17 from vcpkg; compiles `Core/ConfigManager`
 
 ## Git
 
-- Branch: `main`
+- Branches: `main`; `upgrade-winappsdk-2` (WinAppSDK 2.5.1 / CppWinRT 3.0); `msix-packaging` (on top of the upgrade)
 - Remote: `https://github.com/ulvs/fling.git`
-- This commit is the first real landing after the initial empty commit.
