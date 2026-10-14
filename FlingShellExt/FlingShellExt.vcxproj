@@ -15,6 +15,7 @@
     <ProjectGuid>{C0841E4F-C65D-470E-A9A8-8F2A43837CEB}</ProjectGuid>
     <RootNamespace>FlingShellExt</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <VcpkgEnabled>false</VcpkgEnabled>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

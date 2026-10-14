@@ -30,7 +30,9 @@
     <CppWinRTOptimized>true</CppWinRTOptimized>
     <CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
     <CppWinRTGenerateWindowsMetadata>true</CppWinRTGenerateWindowsMetadata>
-    <VcpkgEnabled>false</VcpkgEnabled>
+    <VcpkgEnabled>true</VcpkgEnabled>
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+    <VcpkgTriplet>x64-windows</VcpkgTriplet>
     <UseWinUI>true</UseWinUI>
     <EnableDefaultXamlItems>true</EnableDefaultXamlItems>
   </PropertyGroup>
@@ -74,13 +76,12 @@
       <PreprocessorDefinitions>_DEBUG;USE_IMPORT_EXPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;DISABLE_XAML_GENERATED_MAIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(GeneratedFilesDir)Pages;$(GeneratedFilesDir)Dialogs;C:\dev\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(GeneratedFilesDir)Pages;$(GeneratedFilesDir)Dialogs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\dev\vcpkg\installed\x64-windows\debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>WindowsApp.lib;user32.lib;shell32.lib;aws-cpp-sdk-core.lib;aws-cpp-sdk-s3.lib;aws-cpp-sdk-transfer.lib;aws-crt-cpp.lib;aws-c-auth.lib;aws-c-cal.lib;aws-c-common.lib;aws-c-compression.lib;aws-c-event-stream.lib;aws-c-http.lib;aws-c-io.lib;aws-c-mqtt.lib;aws-c-s3.lib;aws-c-sdkutils.lib;aws-checksums.lib;zlibd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>WindowsApp.lib;user32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 
@@ -93,7 +94,7 @@
       <PreprocessorDefinitions>NDEBUG;USE_IMPORT_EXPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;DISABLE_XAML_GENERATED_MAIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(GeneratedFilesDir)Pages;$(GeneratedFilesDir)Dialogs;C:\dev\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(GeneratedFilesDir)Pages;$(GeneratedFilesDir)Dialogs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
@@ -102,8 +103,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\dev\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>WindowsApp.lib;user32.lib;shell32.lib;aws-cpp-sdk-core.lib;aws-cpp-sdk-s3.lib;aws-cpp-sdk-transfer.lib;aws-crt-cpp.lib;aws-c-auth.lib;aws-c-cal.lib;aws-c-common.lib;aws-c-compression.lib;aws-c-event-stream.lib;aws-c-http.lib;aws-c-io.lib;aws-c-mqtt.lib;aws-c-s3.lib;aws-c-sdkutils.lib;aws-checksums.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>WindowsApp.lib;user32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 
@@ -192,17 +192,6 @@
     </AppxManifest>
   </ItemGroup>
 
-  <PropertyGroup>
-    <_FlingVcpkgBin Condition="'$(Configuration)' == 'Debug'">C:\dev\vcpkg\installed\x64-windows\debug\bin</_FlingVcpkgBin>
-    <_FlingVcpkgBin Condition="'$(Configuration)' != 'Debug'">C:\dev\vcpkg\installed\x64-windows\bin</_FlingVcpkgBin>
-  </PropertyGroup>
-  <ItemGroup>
-    <None Include="$(_FlingVcpkgBin)\*.dll" Exclude="$(_FlingVcpkgBin)\gtest*.dll;$(_FlingVcpkgBin)\gmock*.dll">
-      <DeploymentContent>true</DeploymentContent>
-      <Link>%(Filename)%(Extension)</Link>
-    </None>
-  </ItemGroup>
-
   <ItemGroup>
     <None Include="..\FlingShellExt\$(Platform)\$(Configuration)\FlingShellExt.dll">
       <DeploymentContent>true</DeploymentContent>
@@ -251,6 +240,22 @@
     <ItemGroup>
       <PackagingOutputs Remove="@(PackagingOutputs)"
                         Condition="'%(Filename)%(Extension)' == 'Microsoft.Web.WebView2.Core.dll' And !Exists('%(FullPath)')" />
+    </ItemGroup>
+  </Target>
+
+  <!-- vcpkg's app-local step only reports its DLLs (via ReferenceCopyLocalPaths) when the linker runs, so a
+       no-op rebuild would package without them. Its copied-files log survives, so package from that instead. -->
+  <Target Name="_FlingPackageVcpkgDlls" BeforeTargets="_ComputeAppxPackagePayload" Condition="Exists('$(IntDir)vcpkg.applocal.log')">
+    <ReadLinesFromFile File="$(IntDir)vcpkg.applocal.log">
+      <Output TaskParameter="Lines" ItemName="_FlingVcpkgDll" />
+    </ReadLinesFromFile>
+    <ItemGroup>
+      <PackagingOutputs Remove="@(_FlingVcpkgDll)" />
+      <PackagingOutputs Include="@(_FlingVcpkgDll)" Condition="Exists('%(FullPath)')">
+        <TargetPath>%(Filename)%(Extension)</TargetPath>
+        <OutputGroup>CopyLocalFilesOutputGroup</OutputGroup>
+        <ProjectName>$(ProjectName)</ProjectName>
+      </PackagingOutputs>
     </ItemGroup>
   </Target>
 

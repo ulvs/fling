@@ -27,7 +27,8 @@ Verified live against MinIO at `https://s3.intebitter.se` / bucket `fling` / use
 - **VS 18 (2026) MSBuild + `v145` toolset.** `C:\Program Files\Microsoft Visual Studio\18\Professional\MSBuild\Current\Bin\MSBuild.exe`. Do **not** go back to `v143`: VS 18 then redirects the C++ build to VS 2022's `VC\v170` targets, and the dev box's VS 2022 lacks the WindowsXaml and AppxPackage components. That redirect was the root cause of every XAML build hack from the spring (all removed in the 2026-10 upgrade).
 - **Packages:** Windows App SDK 2.5.1, CppWinRT 3.0.260818.1, SDK BuildTools 10.0.26100.9169, WIL 1.0.260126.7.
 - **Project shape matches the WinUI C++ template:** `ApplicationType=Windows Store`, `ApplicationTypeRevision=10.0`, `AppContainerApplication=false`, `DISABLE_XAML_GENERATED_MAIN` (we have our own single-instance `main.cpp`), `module.g.cpp` listed explicitly, `DependentUpon` on the XAML code-behind/idl items. Because we use `PackageReference` (not packages.config) we also need the `TargetFramework=native` monikers and `ResolveNuGetPackages=false`.
-- **Classic-mode vcpkg** at `C:\dev\vcpkg\installed\x64-windows\` (aws-sdk-cpp, nlohmann-json, zlib, gtest 1.17). Both project files hard-reference these absolute paths — must change before open-sourcing. Manifest mode into the repo failed with `rename_or_delete` errors (probably Defender).
+- **vcpkg manifest mode** (`vcpkg.json`, pinned `builtin-baseline`): aws-sdk-cpp[s3,transfer] (no default features), nlohmann-json, gtest. Installed per-clone into `vcpkg_installed\` by the build (`VcpkgEnableManifest=true`, triplet `x64-windows`); headers/libs auto-linked, DLLs deployed by vcpkg's app-local step (which also feeds the MSIX payload). Needs `vcpkg integrate install` once per machine (VS 18's bundled vcpkg or a vcpkg checkout). `FlingShellExt` opts out (`VcpkgEnabled=false`).
+- **Defender vs. vcpkg:** a fresh port checkout can fail with `rename_or_delete(...buildtrees\versioning_\...tmp) ... being used by another process` — real-time scanning briefly locks the just-extracted folder. Retrying, or renaming the complete `*.tmp` folder to its final name by hand, gets past it; a Defender exclusion for the vcpkg root avoids it. The .sln builds Fling.Tests after Fling so the two projects' installs don't race on the same checkout.
 - **Defender exclusions recommended** for `E:\dev\fling`.
 
 ---
@@ -46,7 +47,7 @@ Fling\x64\Debug\Fling\Fling.exe
 Fling.Tests\x64\Debug\Fling.Tests.exe
 ```
 
-Post-build steps copy vcpkg `x64-windows\[debug\]bin\*.dll` next to both exes.
+vcpkg's app-local step copies the needed DLLs next to both exes.
 
 ---
 
@@ -68,7 +69,7 @@ Get-AppxPackage FlingApp.Fling | Remove-AppxPackage
 ```
 
 - **`FlingShellExt/`** — in-proc `IExplorerCommand` DLL (WRL, static CRT, no WinAppSDK) registered via `windows.fileExplorerContextMenus` + `com:SurrogateServer`. `Invoke` launches the `fling.exe` alias with the selected paths so Fling runs with package identity; the existing single-instance redirect handles the upload. Packaged into Fling's layout via a `<None DeploymentContent>` item; its OutDir is pinned so .sln and project builds agree.
-- **vcpkg DLLs** are package content via a wildcard `<None DeploymentContent>` item (gtest/gmock excluded).
+- **vcpkg DLLs** reach the package via `_FlingPackageVcpkgDlls`, which reads vcpkg's `$(IntDir)vcpkg.applocal.log`. vcpkg's own hand-off (`ReferenceCopyLocalPaths`) only happens when the linker runs, so a no-op rebuild used to produce an .msix without them.
 - **`_FlingDropPhantomWebView2Payload`** target: WebView2's winmd reference implies a non-existent `lib\Microsoft.Web.WebView2.Core.dll`, which collides with the real `native_uap` one (APPX1101).
 - **AppData is virtualized** for the packaged app: new writes to `%LOCALAPPDATA%\Fling` land under `%LOCALAPPDATA%\Packages\FlingApp.Fling_*\LocalCache`. The old SendTo shortcut feature was removed for this reason (the context menu replaces it).
 
@@ -109,7 +110,7 @@ Fling/
   pch.h/.cpp                       WinRT + AWS + nlohmann + XAML impl headers
 ```
 
-Tests in `Fling.Tests/` — gtest 1.17 from vcpkg; compiles `Core/ConfigManager`, `HistoryManager`, `S3Uploader` directly. `AwsTestEnvironment.cpp` does the process-wide `Aws::InitAPI`. `HistoryManagerTests.AddEntry_EnforcesMaxEntries` takes ~30 s (500 disk saves).
+Tests in `Fling.Tests/` — gtest 1.17 from vcpkg (own `TestMain.cpp`, since `gtest_main` is manual-link); compiles `Core/ConfigManager`, `HistoryManager`, `S3Uploader` directly. `AwsTestEnvironment.cpp` does the process-wide `Aws::InitAPI`. `HistoryManagerTests.AddEntry_EnforcesMaxEntries` takes ~30 s (500 disk saves).
 
 ---
 
@@ -118,7 +119,6 @@ Tests in `Fling.Tests/` — gtest 1.17 from vcpkg; compiles `Core/ConfigManager`
 ### Next
 - Verify end to end with the packaged app: right-click a file → "Share with Fling" → URL on clipboard + toast + History entry. Check Settings shows the pre-MSIX config (AppData virtualization).
 - Release signing: self-signed `CN=FlingApp` is fine for local installs, but GitHub Releases users would have to trust the cert manually. Options: a real code-signing cert (e.g. Azure Trusted Signing) or Store-only distribution (the Store re-signs).
-- Remove hard-coded `C:\dev\vcpkg` paths (manifest mode) before open-sourcing.
 
 ### Phase 4 polish
 - `MainWindow::SetupTrayIcon()` exists but is never called from the constructor; wire it up so the tray icon actually appears.

@@ -7,8 +7,13 @@
   "dependencies": [
     {
       "name": "aws-sdk-cpp",
-      "features": ["s3", "transfer"]
+      "features": [
+        "s3",
+        "transfer"
+      ],
+      "default-features": false
     },
-    "nlohmann-json"
+    "nlohmann-json",
+    "gtest"
   ]
 }
