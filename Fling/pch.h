@@ -7,6 +7,9 @@
 #include <hstring.h>
 #include <shellapi.h>
 
+// Conflicts with Storyboard::GetCurrentTime in the WinRT projections.
+#undef GetCurrentTime
+
 // WinRT
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -59,11 +62,3 @@
 
 // JSON
 #include <nlohmann/json.hpp>
-
-// XAML implementation headers - required by XamlTypeInfo.g.cpp static_asserts
-// so the XAML compiler's type table can see complete types for every Page/Window
-// declared in the IDLs.
-#include "MainWindow.xaml.h"
-#include "Pages/SettingsPage.xaml.h"
-#include "Pages/HistoryPage.xaml.h"
-#include "Dialogs/UploadProgressDialog.xaml.h"

@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "MainWindow.xaml.h"
-#include "MainWindow.xaml.g.hpp"
 #include "Pages/SettingsPage.xaml.h"
 #include "Pages/HistoryPage.xaml.h"
 

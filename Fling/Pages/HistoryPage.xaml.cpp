@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "HistoryPage.xaml.h"
-#include "HistoryPage.xaml.g.hpp"
 
 #if __has_include("HistoryPage.g.cpp")
 #include "HistoryPage.g.cpp"

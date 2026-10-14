@@ -21,15 +21,14 @@ protected:
     }
 };
 
-TEST_F(ConfigManagerTests, Load_MissingFile_CreatesDefault)
+TEST_F(ConfigManagerTests, Load_MissingFile_ReturnsDefaultWithoutWriting)
 {
     auto configPath = m_testDir / L"config.json";
     ConfigManager manager(configPath);
 
     auto config = manager.Load();
 
-    // Should create default config
-    EXPECT_TRUE(std::filesystem::exists(configPath));
+    EXPECT_FALSE(std::filesystem::exists(configPath));
     EXPECT_EQ(config.endpoint, L"https://s3.amazonaws.com");
     EXPECT_EQ(config.region, L"us-east-1");
 }

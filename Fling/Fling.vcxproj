@@ -16,10 +16,15 @@
     <ProjectName>Fling</ProjectName>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
-    <TargetPlatformIdentifier>Windows</TargetPlatformIdentifier>
+    <AppContainerApplication>false</AppContainerApplication>
+    <ApplicationType>Windows Store</ApplicationType>
+    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <!-- PackageReference in a .vcxproj needs a 'native' NuGet framework; without these
+         an ApplicationType=Windows Store project resolves packages as UAP and fails. -->
     <TargetFramework>native</TargetFramework>
     <TargetFrameworkMoniker>native,Version=v0.0</TargetFrameworkMoniker>
     <NuGetTargetMoniker>native,Version=v0.0</NuGetTargetMoniker>
+    <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <AppxPackage>false</AppxPackage>
@@ -30,16 +35,6 @@
     <VcpkgEnabled>false</VcpkgEnabled>
     <UseWinUI>true</UseWinUI>
     <EnableDefaultXamlItems>true</EnableDefaultXamlItems>
-    <!-- Tell the XAML markup compiler this is a C++/WinRT project.
-         Without this it defaults to $(Language) = "C++" and emits App.xaml.g.h
-         code that bypasses App_base, making make<implementation::App>() return
-         Microsoft::UI::Xaml::Application instead of Fling::App. -->
-    <XamlLanguage>CppWinRT</XamlLanguage>
-    <!-- Pin XAML codegen output to an absolute path.
-         Without this, MarkupCompilePass writes .xaml.g.h to one location (relative
-         to ProjectDir) while CopyGeneratedXaml resolves the same relative path
-         against the MSBuild invocation CWD, ending up at a different spot. -->
-    <XamlGeneratedOutputPath>$(ProjectDir)$(IntDir)</XamlGeneratedOutputPath>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -47,17 +42,18 @@
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+
 
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
@@ -77,16 +73,16 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;USE_IMPORT_EXPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;USE_IMPORT_EXPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;DISABLE_XAML_GENERATED_MAIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir);$(IntDir)Pages;$(IntDir)Dialogs;C:\dev\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(GeneratedFilesDir)Pages;$(GeneratedFilesDir)Dialogs;C:\dev\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\dev\vcpkg\installed\x64-windows\debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>WindowsApp.lib;aws-cpp-sdk-core.lib;aws-cpp-sdk-s3.lib;aws-cpp-sdk-transfer.lib;aws-crt-cpp.lib;aws-c-auth.lib;aws-c-cal.lib;aws-c-common.lib;aws-c-compression.lib;aws-c-event-stream.lib;aws-c-http.lib;aws-c-io.lib;aws-c-mqtt.lib;aws-c-s3.lib;aws-c-sdkutils.lib;aws-checksums.lib;zlibd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>WindowsApp.lib;user32.lib;shell32.lib;aws-cpp-sdk-core.lib;aws-cpp-sdk-s3.lib;aws-cpp-sdk-transfer.lib;aws-crt-cpp.lib;aws-c-auth.lib;aws-c-cal.lib;aws-c-common.lib;aws-c-compression.lib;aws-c-event-stream.lib;aws-c-http.lib;aws-c-io.lib;aws-c-mqtt.lib;aws-c-s3.lib;aws-c-sdkutils.lib;aws-checksums.lib;zlibd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 
@@ -96,10 +92,10 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;USE_IMPORT_EXPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;USE_IMPORT_EXPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;DISABLE_XAML_GENERATED_MAIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ConformanceMode>false</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir);$(IntDir)Pages;$(IntDir)Dialogs;C:\dev\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(GeneratedFilesDir)Pages;$(GeneratedFilesDir)Dialogs;C:\dev\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
@@ -109,14 +105,18 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\dev\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>WindowsApp.lib;aws-cpp-sdk-core.lib;aws-cpp-sdk-s3.lib;aws-cpp-sdk-transfer.lib;aws-crt-cpp.lib;aws-c-auth.lib;aws-c-cal.lib;aws-c-common.lib;aws-c-compression.lib;aws-c-event-stream.lib;aws-c-http.lib;aws-c-io.lib;aws-c-mqtt.lib;aws-c-s3.lib;aws-c-sdkutils.lib;aws-checksums.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>WindowsApp.lib;user32.lib;shell32.lib;aws-cpp-sdk-core.lib;aws-cpp-sdk-s3.lib;aws-cpp-sdk-transfer.lib;aws-crt-cpp.lib;aws-c-auth.lib;aws-c-cal.lib;aws-c-common.lib;aws-c-compression.lib;aws-c-event-stream.lib;aws-c-http.lib;aws-c-io.lib;aws-c-mqtt.lib;aws-c-s3.lib;aws-c-sdkutils.lib;aws-checksums.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 
   <ItemGroup>
     <ClInclude Include="pch.h" />
-    <ClInclude Include="App.xaml.h" />
-    <ClInclude Include="MainWindow.xaml.h" />
+    <ClInclude Include="App.xaml.h">
+      <DependentUpon>App.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="MainWindow.xaml.h">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </ClInclude>
     <ClInclude Include="Core\S3Uploader.h" />
     <ClInclude Include="Core\ConfigManager.h" />
     <ClInclude Include="Core\HistoryManager.h" />
@@ -126,9 +126,15 @@
     <ClInclude Include="Core\SendToInstaller.h" />
     <ClInclude Include="Models\FlingConfig.h" />
     <ClInclude Include="Models\UploadEntry.h" />
-    <ClInclude Include="Pages\SettingsPage.xaml.h" />
-    <ClInclude Include="Pages\HistoryPage.xaml.h" />
-    <ClInclude Include="Dialogs\UploadProgressDialog.xaml.h" />
+    <ClInclude Include="Pages\SettingsPage.xaml.h">
+      <DependentUpon>Pages\SettingsPage.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="Pages\HistoryPage.xaml.h">
+      <DependentUpon>Pages\HistoryPage.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="Dialogs\UploadProgressDialog.xaml.h">
+      <DependentUpon>Dialogs\UploadProgressDialog.xaml</DependentUpon>
+    </ClInclude>
   </ItemGroup>
 
   <ItemGroup>
@@ -136,8 +142,12 @@
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="App.xaml.cpp" />
-    <ClCompile Include="MainWindow.xaml.cpp" />
+    <ClCompile Include="App.xaml.cpp">
+      <DependentUpon>App.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="MainWindow.xaml.cpp">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </ClCompile>
     <ClCompile Include="Core\S3Uploader.cpp" />
     <ClCompile Include="Core\ConfigManager.cpp" />
     <ClCompile Include="Core\HistoryManager.cpp" />
@@ -147,18 +157,16 @@
     <ClCompile Include="Core\SendToInstaller.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Pages\SettingsPage.xaml.cpp" />
-    <ClCompile Include="Pages\HistoryPage.xaml.cpp" />
-    <ClCompile Include="Dialogs\UploadProgressDialog.xaml.cpp" />
-    <!-- XAML-compiler-generated files that aren't auto-added by CppWinRT targets.
-         XamlTypeInfo.Impl.g.cpp has the XamlMetaDataProvider method bodies;
-         XamlTypeInfo.g.cpp and module.g.cpp provide ABI wiring. -->
-    <ClCompile Include="XamlMetaDataProvider.cpp">
-      <ObjectFileName>$(IntDir)XamlMetaDataProvider_local.obj</ObjectFileName>
+    <ClCompile Include="Pages\SettingsPage.xaml.cpp">
+      <DependentUpon>Pages\SettingsPage.xaml</DependentUpon>
     </ClCompile>
-    <ClCompile Include="$(IntDir)Generated Files\module.g.cpp" />
-    <ClCompile Include="$(IntDir)XamlTypeInfo.g.cpp" />
-    <ClCompile Include="$(IntDir)XamlTypeInfo.Impl.g.cpp" />
+    <ClCompile Include="Pages\HistoryPage.xaml.cpp">
+      <DependentUpon>Pages\HistoryPage.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="Dialogs\UploadProgressDialog.xaml.cpp">
+      <DependentUpon>Dialogs\UploadProgressDialog.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
   </ItemGroup>
 
   <ItemGroup>
@@ -184,11 +192,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Midl Include="App.idl" />
-    <Midl Include="MainWindow.idl" />
-    <Midl Include="Pages\SettingsPage.idl" />
-    <Midl Include="Pages\HistoryPage.idl" />
-    <Midl Include="Dialogs\UploadProgressDialog.idl" />
+    <Midl Include="MainWindow.idl">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </Midl>
+    <Midl Include="Pages\SettingsPage.idl">
+      <DependentUpon>Pages\SettingsPage.xaml</DependentUpon>
+    </Midl>
+    <Midl Include="Pages\HistoryPage.idl">
+      <DependentUpon>Pages\HistoryPage.xaml</DependentUpon>
+    </Midl>
+    <Midl Include="Dialogs\UploadProgressDialog.idl">
+      <DependentUpon>Dialogs\UploadProgressDialog.xaml</DependentUpon>
+    </Midl>
   </ItemGroup>
 
   <ItemGroup>
@@ -198,10 +213,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Windows.CppWinRT" Version="2.0.240405.15" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250108002" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1742" />
-    <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="1.0.240803.1" />
+    <PackageReference Include="Microsoft.Windows.CppWinRT" Version="3.0.260818.1" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.9169" />
+    <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="1.0.260126.7" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
@@ -222,11 +237,4 @@
           SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- Hook XAML MarkupCompilePass1/2 into the native C++ build pipeline.
-       The WindowsAppSDK Markup Compiler targets chain them off PrepareResources,
-       which is part of the managed build, not the native one. -->
-  <Target Name="_FlingRunXamlMarkupCompile"
-          BeforeTargets="ClCompile"
-          DependsOnTargets="MarkupCompilePass1;MarkupCompilePass2"
-          Condition="'@(Page)' != '' Or '@(ApplicationDefinition)' != ''" />
 </Project>

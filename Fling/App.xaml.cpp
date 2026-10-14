@@ -163,7 +163,15 @@ namespace winrt::Fling::implementation
 
     void App::RegisterAppNotifications()
     {
-        auto notificationManager = AppNotificationManager::Default();
-        notificationManager.Register();
+        // Unpackaged self-contained builds can fail here (runtime resources missing);
+        // uploads still work, only the toast is lost.
+        try
+        {
+            AppNotificationManager::Default().Register();
+        }
+        catch (winrt::hresult_error const& e)
+        {
+            OutputDebugStringW((L"Fling: AppNotificationManager::Register failed: " + e.message() + L"\n").c_str());
+        }
     }
 }

@@ -3,6 +3,10 @@
 #include "Models/FlingConfig.h"
 #include "Core/S3Uploader.h"
 
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+
 using namespace Fling::Core;
 using namespace Fling::Models;
 
@@ -36,12 +40,38 @@ protected:
         TestHelpers::CleanupTempDirectory(m_testDir);
     }
 
-    bool IsMinioRunning()
+    // Raw TCP probe: going through S3Uploader takes over a minute of SDK retries to fail.
+    static bool IsMinioRunning()
     {
-        // Quick check if MinIO is reachable
-        S3Uploader uploader(m_config);
-        auto result = uploader.TestConnection();
-        return result.success;
+        static const bool running = []
+        {
+            WSADATA wsa{};
+            if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+            {
+                return false;
+            }
+            bool ok = false;
+            SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+            if (s != INVALID_SOCKET)
+            {
+                u_long nonBlocking = 1;
+                ioctlsocket(s, FIONBIO, &nonBlocking);
+                sockaddr_in addr{};
+                addr.sin_family = AF_INET;
+                addr.sin_port = htons(9000);
+                inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+                connect(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+                fd_set writable;
+                FD_ZERO(&writable);
+                FD_SET(s, &writable);
+                timeval timeout{ 0, 500'000 };
+                ok = select(0, nullptr, &writable, nullptr, &timeout) == 1;
+                closesocket(s);
+            }
+            WSACleanup();
+            return ok;
+        }();
+        return running;
     }
 };
 
@@ -60,6 +90,11 @@ TEST_F(S3UploaderIntegrationTests, TestConnection_Success)
 
 TEST_F(S3UploaderIntegrationTests, TestConnection_InvalidCredentials)
 {
+    if (!IsMinioRunning())
+    {
+        GTEST_SKIP() << "MinIO not running, skipping integration test";
+    }
+
     auto badConfig = m_config;
     badConfig.accessKey = L"invalid";
     badConfig.secretKey = L"invalid";
@@ -72,6 +107,11 @@ TEST_F(S3UploaderIntegrationTests, TestConnection_InvalidCredentials)
 
 TEST_F(S3UploaderIntegrationTests, TestConnection_InvalidBucket)
 {
+    if (!IsMinioRunning())
+    {
+        GTEST_SKIP() << "MinIO not running, skipping integration test";
+    }
+
     auto badConfig = m_config;
     badConfig.bucket = L"nonexistent-bucket-12345";
 
@@ -183,11 +223,8 @@ TEST_F(S3UploaderIntegrationTests, DISABLED_Upload_LargeFile)
     auto testFile = TestHelpers::CreateTestFile(m_testDir, L"large.bin", 150 * 1024 * 1024);
 
     S3Uploader uploader(m_config);
-    auto result = uploader.Upload(testFile, [](uint64_t transferred, uint64_t total)
+    auto result = uploader.Upload(testFile, [](uint64_t, uint64_t)
     {
-        // Progress callback for monitoring
-        double percent = (static_cast<double>(transferred) / total) * 100;
-        // Could log progress here
     });
 
     EXPECT_TRUE(result.success);

@@ -21,15 +21,15 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
 
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
 
@@ -53,9 +53,10 @@
       <AdditionalIncludeDirectories>$(ProjectDir)..\Fling;C:\dev\vcpkg\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\dev\vcpkg\installed\x64-windows\debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\dev\vcpkg\installed\x64-windows\debug\lib;C:\dev\vcpkg\installed\x64-windows\debug\lib\manual-link;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>gtest.lib;gtest_main.lib;shell32.lib;ole32.lib;aws-cpp-sdk-core.lib;aws-cpp-sdk-s3.lib;aws-cpp-sdk-transfer.lib;aws-crt-cpp.lib;aws-c-auth.lib;aws-c-cal.lib;aws-c-common.lib;aws-c-compression.lib;aws-c-event-stream.lib;aws-c-http.lib;aws-c-io.lib;aws-c-mqtt.lib;aws-c-s3.lib;aws-c-sdkutils.lib;aws-checksums.lib;zlibd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 
@@ -73,11 +74,12 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\dev\vcpkg\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\dev\vcpkg\installed\x64-windows\lib;C:\dev\vcpkg\installed\x64-windows\lib\manual-link;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>gtest.lib;gtest_main.lib;shell32.lib;ole32.lib;aws-cpp-sdk-core.lib;aws-cpp-sdk-s3.lib;aws-cpp-sdk-transfer.lib;aws-crt-cpp.lib;aws-c-auth.lib;aws-c-cal.lib;aws-c-common.lib;aws-c-compression.lib;aws-c-event-stream.lib;aws-c-http.lib;aws-c-io.lib;aws-c-mqtt.lib;aws-c-s3.lib;aws-c-sdkutils.lib;aws-checksums.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 
@@ -90,16 +92,28 @@
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="AwsTestEnvironment.cpp" />
     <ClCompile Include="FlingConfigTests.cpp" />
     <ClCompile Include="UploadEntryTests.cpp" />
     <ClCompile Include="ConfigManagerTests.cpp" />
     <ClCompile Include="HistoryManagerTests.cpp" />
     <ClCompile Include="S3UploaderIntegrationTests.cpp" />
+    <ClCompile Include="..\Fling\Core\ConfigManager.cpp" />
+    <ClCompile Include="..\Fling\Core\HistoryManager.cpp" />
+    <ClCompile Include="..\Fling\Core\S3Uploader.cpp" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.googletest.v140.windesktop.msvcstl.static.rt-dyn" Version="1.8.1.7" />
-  </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+
+  <Target Name="_FlingTestsCopyVcpkgRuntime" AfterTargets="Build">
+    <PropertyGroup>
+      <_VcpkgBinDir Condition="'$(Configuration)' == 'Debug'">C:\dev\vcpkg\installed\x64-windows\debug\bin</_VcpkgBinDir>
+      <_VcpkgBinDir Condition="'$(Configuration)' != 'Debug'">C:\dev\vcpkg\installed\x64-windows\bin</_VcpkgBinDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_VcpkgDlls Include="$(_VcpkgBinDir)\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_VcpkgDlls)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

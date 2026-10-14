@@ -107,3 +107,6 @@ build_output.txt
 # Test results
 TestResults/
 *.trx
+
+# C++/WinRT + XAML compiler output
+**/Generated Files/

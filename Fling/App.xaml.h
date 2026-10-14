@@ -1,5 +1,5 @@
 #pragma once
-#include "App.g.h"
+#include "App.xaml.g.h"
 #include <memory>
 
 namespace Aws { struct SDKOptions; }
@@ -42,12 +42,5 @@ namespace winrt::Fling::implementation
         void InitializeAwsSdk();
         void ShutdownAwsSdk();
         void RegisterAppNotifications();
-    };
-}
-
-namespace winrt::Fling::factory_implementation
-{
-    struct App : AppT<App, implementation::App>
-    {
     };
 }

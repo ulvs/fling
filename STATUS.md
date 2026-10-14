@@ -1,4 +1,4 @@
-# Fling — Current Status (2026-04-24)
+# Fling — Current Status (2026-10-14)
 
 Handoff snapshot for continuing development on another machine.
 
@@ -22,38 +22,41 @@ Verified live against MinIO at `https://s3.intebitter.se` / bucket `fling` / use
 
 ---
 
-## Build environment quirks (important)
+## Build environment (important)
 
-- **Use VS 2026 MSBuild** (`C:\Program Files\Microsoft Visual Studio\18\Professional\MSBuild\Current\Bin\MSBuild.exe`), not VS 2022. VS 2022 on the dev box is missing `Microsoft.Build.Packaging.Pri.Tasks.dll` (the `MSBuild\Microsoft\VisualStudio\v17.0\AppxPackage\` folder doesn't exist). VS 2026 has the equivalent at `v18.0\AppxPackage\`. Fix on a new machine: install VS 2026 Preview, or add the **MSIX Packaging Tools** component to whatever VS version you use.
-- **Classic-mode vcpkg** at `C:\dev\vcpkg\installed\x64-windows\` is where AWS SDK + nlohmann-json + zlib live. Both `Fling.vcxproj` and `Fling.Tests.vcxproj` hard-reference absolute paths there. Vcpkg manifest-mode install (`vcpkg_installed\` under the repo) fails reproducibly on the dev box with `rename_or_delete` errors — probably Defender interference.
-- **Defender exclusions recommended.** Scanning the build output and AWS DLLs every rebuild makes Defender eat 1–2 GB RAM and a CPU core. Add `E:\dev\fling` to Windows Security → Virus & threat protection → Exclusions.
+- **VS 18 (2026) MSBuild + `v145` toolset.** `C:\Program Files\Microsoft Visual Studio\18\Professional\MSBuild\Current\Bin\MSBuild.exe`. Do **not** go back to `v143`: VS 18 then redirects the C++ build to VS 2022's `VC\v170` targets, and the dev box's VS 2022 lacks the WindowsXaml and AppxPackage components. That redirect was the root cause of every XAML build hack from the spring (all removed in the 2026-10 upgrade).
+- **Packages:** Windows App SDK 2.5.1, CppWinRT 3.0.260818.1, SDK BuildTools 10.0.26100.9169, WIL 1.0.260126.7.
+- **Project shape matches the WinUI C++ template:** `ApplicationType=Windows Store`, `ApplicationTypeRevision=10.0`, `AppContainerApplication=false`, `DISABLE_XAML_GENERATED_MAIN` (we have our own single-instance `main.cpp`), `module.g.cpp` listed explicitly, `DependentUpon` on the XAML code-behind/idl items. Because we use `PackageReference` (not packages.config) we also need the `TargetFramework=native` monikers and `ResolveNuGetPackages=false`.
+- **Classic-mode vcpkg** at `C:\dev\vcpkg\installed\x64-windows\` (aws-sdk-cpp, nlohmann-json, zlib, gtest 1.17). Both project files hard-reference these absolute paths — must change before open-sourcing. Manifest mode into the repo failed with `rename_or_delete` errors (probably Defender).
+- **Defender exclusions recommended** for `E:\dev\fling`.
 
 ---
 
-## Build / run
+## Build / run / test
 
 ```
 # Build from repo root
-"C:\Program Files\Microsoft Visual Studio\18\Professional\MSBuild\Current\Bin\MSBuild.exe" Fling/Fling.vcxproj -p:Configuration=Debug -p:Platform=x64
+"C:\Program Files\Microsoft Visual Studio\18\Professional\MSBuild\Current\Bin\MSBuild.exe" Fling/Fling.vcxproj -restore -p:Configuration=Debug -p:Platform=x64
 
-# Launch
-Fling\x64\Debug\Fling.exe
+# Launch (output layout is per-project now)
+Fling\x64\Debug\Fling\Fling.exe
+
+# Tests (38 unit tests; MinIO integration tests skip unless `docker compose up -d` is running)
+"...\MSBuild.exe" Fling.Tests/Fling.Tests.vcxproj -p:Configuration=Debug -p:Platform=x64
+Fling.Tests\x64\Debug\Fling.Tests.exe
 ```
 
-A post-build step in `Fling.vcxproj` copies all vcpkg `x64-windows\[debug\]bin\*.dll` next to `Fling.exe` — Fling won't launch without those.
+Post-build steps copy vcpkg `x64-windows\[debug\]bin\*.dll` next to both exes.
 
 ---
 
 ## Key implementation notes
 
-These are the non-obvious fixes from the last session, worth knowing before touching things:
-
-1. **XAML markup compiler output path** is pinned via `<XamlGeneratedOutputPath>$(ProjectDir)$(IntDir)</XamlGeneratedOutputPath>`. Without this, Pass2 and the Copy target interpret a relative `OutputPath` differently and `.xaml.g.h` / `.xbf` files land in mismatched locations.
-2. **`Fling/App.xaml.g.h` is an override**, not auto-generated. The WindowsAppSDK 1.6 markup compiler emits an old-style `AppT` for the `ApplicationDefinition` that bypasses `App_base`, which breaks `make<implementation::App>()`. Our hand-written override lives at `Fling/App.xaml.g.h` (ProjectDir wins on the include search before the generator's copy in `$(IntDir)`). If you regenerate / upgrade WindowsAppSDK, check whether the upstream generator emits `App_base`-based code now and delete the override.
-3. **`Fling/XamlMetaDataProvider.cpp`** is a hand-written adapter that includes the XAML-compiler-generated `.g.cpp` with pch. The generator also emits a file at `Generated Files\XamlMetaDataProvider.cpp` with the same content, but MSBuild silently deduplicates it out of the ClCompile list (collides with a CppWinRT auto-add). Keeping our copy at a unique path works around this.
-4. **Explicit ClCompile entries** in `Fling.vcxproj`: `XamlTypeInfo.g.cpp`, `XamlTypeInfo.Impl.g.cpp`, `module.g.cpp`, `XamlMetaDataProvider.cpp` all need to be called out — CppWinRT doesn't auto-add them in this project setup.
-5. **pch.h must `#include` every XAML implementation header** (`MainWindow.xaml.h`, the page headers, the dialog header) or `XamlTypeInfo.g.cpp`'s static_asserts fail.
-6. **Preprocessor**: `NOMINMAX;WIN32_LEAN_AND_MEAN;USE_IMPORT_EXPORT` defined project-wide. Without `NOMINMAX` the Windows SDK's `max`/`min` macros garble `std::numeric_limits<...>::max()` in aws-sdk-cpp's TransferManager.h and cascade into dozens of fake parse errors.
+1. **No `App.idl`.** As in the WinUI template, `App` is not a WinRT runtime class; `App.xaml.h` includes the XAML compiler's `App.xaml.g.h`.
+2. Page `.xaml.cpp` files must **not** include `*.xaml.g.hpp` — those are produced by markup pass 2 after the main compile and are pulled in by `XamlTypeInfo.g.cpp`.
+3. Generated code lives in `Fling\Generated Files\` (git-ignored); `Generated Files\Pages` and `\Dialogs` are on the include path so `X.g.h` can find `X.xaml.g.h`.
+4. **Preprocessor**: `NOMINMAX;WIN32_LEAN_AND_MEAN;USE_IMPORT_EXPORT`. Without `NOMINMAX` the Windows `max`/`min` macros break aws-sdk-cpp's TransferManager.h.
+5. **Unpackaged toast notifications are broken on WinAppSDK 2.x self-contained:** `AppNotificationManager::Register()` fails loading `Microsoft.WindowsAppRuntime.Insights.Resource.dll`. App catches it and carries on (no toast). Expected to be fixed by moving to MSIX.
 
 ---
 
@@ -61,10 +64,8 @@ These are the non-obvious fixes from the last session, worth knowing before touc
 
 ```
 Fling/
-  App.xaml(.h/.cpp/.idl/.g.h)      App lifecycle, AWS init, redirected-activation handler
-  App.xaml.g.h                     ← OVERRIDE, see note 2 above
+  App.xaml(.h/.cpp)                App lifecycle, AWS init, redirected-activation handler
   main.cpp                         AppInstance single-instance redirect
-  XamlMetaDataProvider.cpp         ← ADAPTER, see note 3 above
   MainWindow.xaml(.h/.cpp/.idl)    NavigationView + tray icon scaffolding
   Pages/
     SettingsPage.xaml(.h/.cpp/.idl)  S3 creds + SendTo toggle
@@ -85,7 +86,7 @@ Fling/
   pch.h/.cpp                       WinRT + AWS + nlohmann + XAML impl headers
 ```
 
-Tests in `Fling.Tests/` — builds, and all tests compile except `GTEST_SKIP` usages in `S3UploaderIntegrationTests.cpp` (the NuGet gtest is 1.8.1, `GTEST_SKIP` is 1.10+). Bumping the gtest package is a one-line fix.
+Tests in `Fling.Tests/` — gtest 1.17 from vcpkg; compiles `Core/ConfigManager`, `HistoryManager`, `S3Uploader` directly. `AwsTestEnvironment.cpp` does the process-wide `Aws::InitAPI`. `HistoryManagerTests.AddEntry_EnforcesMaxEntries` takes ~30 s (500 disk saves).
 
 ---
 

@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "UploadProgressDialog.xaml.h"
-#include "UploadProgressDialog.xaml.g.hpp"
 
 #if __has_include("UploadProgressDialog.g.cpp")
 #include "UploadProgressDialog.g.cpp"
