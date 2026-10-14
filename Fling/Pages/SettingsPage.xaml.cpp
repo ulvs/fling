@@ -7,7 +7,6 @@
 
 #include "Core/ConfigManager.h"
 #include "Core/S3Uploader.h"
-#include "Core/SendToInstaller.h"
 #include "Models/FlingConfig.h"
 
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
@@ -43,37 +42,6 @@ namespace winrt::Fling::implementation
         SecretKeyPasswordBox().Password(hstring(config.secretKey));
         ExpiryNumberBox().Value(static_cast<double>(config.expirySeconds));
         PathStyleCheckBox().IsChecked(config.usePathStyle);
-
-        // Reflect current state of the Send To shortcut without re-triggering
-        // the Toggled handler.
-        SendToToggle().IsOn(SendToInstaller::IsInstalled());
-    }
-
-    void SettingsPage::SendToToggle_Toggled(IInspectable const& sender, RoutedEventArgs const&)
-    {
-        auto toggle = sender.try_as<ToggleSwitch>();
-        if (!toggle)
-        {
-            return;
-        }
-
-        bool ok = toggle.IsOn()
-            ? SendToInstaller::Install()
-            : SendToInstaller::Uninstall();
-
-        if (!ok)
-        {
-            ShowStatus(false, toggle.IsOn()
-                ? L"Failed to create Send To shortcut."
-                : L"Failed to remove Send To shortcut.");
-            // Snap the toggle back to reality if the filesystem op failed.
-            toggle.IsOn(SendToInstaller::IsInstalled());
-            return;
-        }
-
-        ShowStatus(true, toggle.IsOn()
-            ? L"Send To enabled. Right-click a file in Explorer \u2192 Send to \u2192 Fling."
-            : L"Send To shortcut removed.");
     }
 
     void SettingsPage::SaveConfig()

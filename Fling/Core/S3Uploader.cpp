@@ -3,6 +3,7 @@
 
 #include <aws/core/auth/AWSCredentials.h>
 #include <aws/core/client/ClientConfiguration.h>
+#include <aws/core/client/DefaultRetryStrategy.h>
 #include <aws/core/http/Scheme.h>
 #include <aws/core/utils/UUID.h>
 #include <aws/core/utils/memory/AWSMemory.h>
@@ -97,7 +98,13 @@ namespace Fling::Core
     S3Uploader::S3Uploader(FlingConfig const& config)
         : m_config(config)
     {
-        Aws::Client::ClientConfiguration clientConfig;
+        // No EC2 metadata probing and few retries: the SDK defaults made an unreachable
+        // endpoint take ~50 s to report failure.
+        Aws::Client::ClientConfigurationInitValues initValues;
+        initValues.shouldDisableIMDS = true;
+        Aws::Client::ClientConfiguration clientConfig(initValues);
+        clientConfig.connectTimeoutMs = 5000;
+        clientConfig.retryStrategy = Aws::MakeShared<Aws::Client::DefaultRetryStrategy>("FlingS3Client", 2);
         if (!m_config.region.empty())
         {
             clientConfig.region = ToAws(m_config.region);

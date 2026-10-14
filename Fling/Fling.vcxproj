@@ -121,7 +121,6 @@
     <ClInclude Include="Core\ClipboardHelper.h" />
     <ClInclude Include="Core\ToastHelper.h" />
     <ClInclude Include="Core\UploadCoordinator.h" />
-    <ClInclude Include="Core\SendToInstaller.h" />
     <ClInclude Include="Models\FlingConfig.h" />
     <ClInclude Include="Models\UploadEntry.h" />
     <ClInclude Include="Pages\SettingsPage.xaml.h">
@@ -152,9 +151,6 @@
     <ClCompile Include="Core\ClipboardHelper.cpp" />
     <ClCompile Include="Core\ToastHelper.cpp" />
     <ClCompile Include="Core\UploadCoordinator.cpp" />
-    <ClCompile Include="Core\SendToInstaller.cpp">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="Pages\SettingsPage.xaml.cpp">
       <DependentUpon>Pages\SettingsPage.xaml</DependentUpon>
     </ClCompile>

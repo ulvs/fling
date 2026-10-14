@@ -70,7 +70,7 @@ Get-AppxPackage FlingApp.Fling | Remove-AppxPackage
 - **`FlingShellExt/`** — in-proc `IExplorerCommand` DLL (WRL, static CRT, no WinAppSDK) registered via `windows.fileExplorerContextMenus` + `com:SurrogateServer`. `Invoke` launches the `fling.exe` alias with the selected paths so Fling runs with package identity; the existing single-instance redirect handles the upload. Packaged into Fling's layout via a `<None DeploymentContent>` item; its OutDir is pinned so .sln and project builds agree.
 - **vcpkg DLLs** are package content via a wildcard `<None DeploymentContent>` item (gtest/gmock excluded).
 - **`_FlingDropPhantomWebView2Payload`** target: WebView2's winmd reference implies a non-existent `lib\Microsoft.Web.WebView2.Core.dll`, which collides with the real `native_uap` one (APPX1101).
-- **AppData is virtualized** for the packaged app: new writes to `%LOCALAPPDATA%\Fling` / `%APPDATA%\...\SendTo` land under `%LOCALAPPDATA%\Packages\FlingApp.Fling_*\LocalCache`. The SendTo toggle is therefore likely broken when packaged (and redundant with the context menu).
+- **AppData is virtualized** for the packaged app: new writes to `%LOCALAPPDATA%\Fling` land under `%LOCALAPPDATA%\Packages\FlingApp.Fling_*\LocalCache`. The old SendTo shortcut feature was removed for this reason (the context menu replaces it).
 
 ---
 
@@ -92,7 +92,7 @@ Fling/
   main.cpp                         AppInstance single-instance redirect
   MainWindow.xaml(.h/.cpp/.idl)    NavigationView + tray icon scaffolding
   Pages/
-    SettingsPage.xaml(.h/.cpp/.idl)  S3 creds + SendTo toggle
+    SettingsPage.xaml(.h/.cpp/.idl)  S3 creds + Test connection
     HistoryPage.xaml(.h/.cpp/.idl)   History list + "Share a file..." button
   Dialogs/
     UploadProgressDialog.xaml(.h/.cpp/.idl)  Scaffold, not used yet
@@ -103,7 +103,6 @@ Fling/
     ClipboardHelper.cpp            WinRT Clipboard
     ToastHelper.cpp                AppNotificationBuilder
     UploadCoordinator.cpp          Orchestrates config → upload → clipboard → toast → history
-    SendToInstaller.cpp            Creates/removes %APPDATA%\Microsoft\Windows\SendTo\Fling.lnk
   Models/
     FlingConfig.h                  + to_json / from_json
     UploadEntry.h                  + to_json / from_json
@@ -118,10 +117,8 @@ Tests in `Fling.Tests/` — gtest 1.17 from vcpkg; compiles `Core/ConfigManager`
 
 ### Next
 - Verify end to end with the packaged app: right-click a file → "Share with Fling" → URL on clipboard + toast + History entry. Check Settings shows the pre-MSIX config (AppData virtualization).
-- Decide the SendTo toggle's fate under MSIX (likely remove — the context menu replaces it).
 - Release signing: self-signed `CN=FlingApp` is fine for local installs, but GitHub Releases users would have to trust the cert manually. Options: a real code-signing cert (e.g. Azure Trusted Signing) or Store-only distribution (the Store re-signs).
 - Remove hard-coded `C:\dev\vcpkg` paths (manifest mode) before open-sourcing.
-- `S3Uploader` sets no connect timeout: "Test connection" against an unreachable endpoint hangs ~70 s.
 
 ### Phase 4 polish
 - `MainWindow::SetupTrayIcon()` exists but is never called from the constructor; wire it up so the tray icon actually appears.
@@ -129,7 +126,7 @@ Tests in `Fling.Tests/` — gtest 1.17 from vcpkg; compiles `Core/ConfigManager`
 - Implement Cancel button on upload progress.
 
 ### Phase 5
-- Multi-file Send To (Windows passes multiple paths space-separated to the target — `CommandLineToArgvW` already handles this, just need to iterate).
+- Multi-file sharing: the context menu already passes every selected path; check `UploadCoordinator` copies a combined result sensibly (currently one upload/toast per file).
 - Drag-and-drop onto window or tray icon.
 - Credential storage via Windows Credential Manager instead of plain-text JSON in `%LOCALAPPDATA%\Fling\config.json`.
 - Add `s3:AbortMultipartUpload` to the MinIO policy before testing files >100 MB with mid-flight cancellation.

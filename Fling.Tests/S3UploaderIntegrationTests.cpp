@@ -163,6 +163,20 @@ TEST_F(S3UploaderIntegrationTests, Upload_WithProgressCallback)
     EXPECT_TRUE(progressCalled);
 }
 
+TEST_F(S3UploaderIntegrationTests, TestConnection_UnreachableEndpoint_FailsFast)
+{
+    auto badConfig = m_config;
+    badConfig.endpoint = L"http://127.0.0.1:1";
+
+    auto start = std::chrono::steady_clock::now();
+    S3Uploader uploader(badConfig);
+    auto result = uploader.TestConnection();
+    auto elapsed = std::chrono::steady_clock::now() - start;
+
+    EXPECT_FALSE(result.success);
+    EXPECT_LT(elapsed, std::chrono::seconds(10));
+}
+
 TEST_F(S3UploaderIntegrationTests, Upload_NonexistentFile)
 {
     S3Uploader uploader(m_config);
