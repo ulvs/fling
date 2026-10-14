@@ -105,6 +105,10 @@ namespace Fling::Core
         Aws::Client::ClientConfiguration clientConfig(initValues);
         clientConfig.connectTimeoutMs = 5000;
         clientConfig.retryStrategy = Aws::MakeShared<Aws::Client::DefaultRetryStrategy>("FlingS3Client", 2);
+        // Optional CRC checksums (aws-chunked trailers) are rejected by Cloudflare R2 and some
+        // older MinIO/Ceph builds; only send them when an operation requires one.
+        clientConfig.checksumConfig.requestChecksumCalculation = Aws::Client::RequestChecksumCalculation::WHEN_REQUIRED;
+        clientConfig.checksumConfig.responseChecksumValidation = Aws::Client::ResponseChecksumValidation::WHEN_REQUIRED;
         if (!m_config.region.empty())
         {
             clientConfig.region = ToAws(m_config.region);

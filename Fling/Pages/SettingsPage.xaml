@@ -14,11 +14,11 @@
 
             <TextBox x:Name="EndpointTextBox"
                      Header="Endpoint URL"
-                     PlaceholderText="https://s3.amazonaws.com or http://localhost:9000"/>
+                     PlaceholderText="https://ACCOUNT_ID.r2.cloudflarestorage.com, https://s3.amazonaws.com, ..."/>
 
             <TextBox x:Name="RegionTextBox"
                      Header="Region"
-                     PlaceholderText="us-east-1"/>
+                     PlaceholderText="us-east-1 (Cloudflare R2: auto)"/>
 
             <TextBox x:Name="BucketTextBox"
                      Header="Bucket Name"
