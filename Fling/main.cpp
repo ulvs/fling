@@ -21,6 +21,9 @@ int WINAPI wWinMain(
 
     if (!keyInstance.IsCurrent())
     {
+        // Explorer gave this process foreground rights; pass them on so the running
+        // instance's send window comes to the front instead of flashing in the taskbar.
+        AllowSetForegroundWindow(ASFW_ANY);
         keyInstance.RedirectActivationToAsync(activationArgs).get();
         return 0;
     }

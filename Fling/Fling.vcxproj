@@ -75,6 +75,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;USE_IMPORT_EXPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;DISABLE_XAML_GENERATED_MAIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>false</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(GeneratedFilesDir)Pages;$(GeneratedFilesDir)Dialogs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -93,6 +94,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;USE_IMPORT_EXPORT;NOMINMAX;WIN32_LEAN_AND_MEAN;DISABLE_XAML_GENERATED_MAIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <ConformanceMode>false</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(GeneratedFilesDir)Pages;$(GeneratedFilesDir)Dialogs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -115,6 +117,10 @@
     <ClInclude Include="MainWindow.xaml.h">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </ClInclude>
+    <ClInclude Include="SendWindow.xaml.h">
+      <DependentUpon>SendWindow.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="Core\Format.h" />
     <ClInclude Include="Core\S3Uploader.h" />
     <ClInclude Include="Core\ConfigManager.h" />
     <ClInclude Include="Core\HistoryManager.h" />
@@ -145,6 +151,9 @@
     <ClCompile Include="MainWindow.xaml.cpp">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </ClCompile>
+    <ClCompile Include="SendWindow.xaml.cpp">
+      <DependentUpon>SendWindow.xaml</DependentUpon>
+    </ClCompile>
     <ClCompile Include="Core\S3Uploader.cpp" />
     <ClCompile Include="Core\ConfigManager.cpp" />
     <ClCompile Include="Core\HistoryManager.cpp" />
@@ -168,6 +177,9 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Page Include="MainWindow.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="SendWindow.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Include="Pages\SettingsPage.xaml">
@@ -205,6 +217,9 @@
   <ItemGroup>
     <Midl Include="MainWindow.idl">
       <DependentUpon>MainWindow.xaml</DependentUpon>
+    </Midl>
+    <Midl Include="SendWindow.idl">
+      <DependentUpon>SendWindow.xaml</DependentUpon>
     </Midl>
     <Midl Include="Pages\SettingsPage.idl">
       <DependentUpon>Pages\SettingsPage.xaml</DependentUpon>

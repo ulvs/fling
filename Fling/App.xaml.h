@@ -1,6 +1,9 @@
 #pragma once
 #include "App.xaml.g.h"
+#include <winrt/Fling.h>
+#include <filesystem>
 #include <memory>
+#include <vector>
 
 namespace Aws { struct SDKOptions; }
 
@@ -13,21 +16,20 @@ namespace winrt::Fling::implementation
 
         void OnLaunched(Microsoft::UI::Xaml::LaunchActivatedEventArgs const&);
 
-        // Handle file activation from context menu
-        void ProcessCommandLineArgs();
-        void ProcessFilePath(std::wstring const& filePath);
+        // Main window (Settings/History), created on first use. page: "settings", "history" or empty.
+        static void ShowMainWindow(hstring const& page = L"");
 
-        // HWND of the main window, so pages can attach FilePickers etc.
-        // Populated in OnLaunched once the native window handle is available.
+        // Compact window that uploads the given files (Explorer "Share with Fling").
+        static void ShowSendWindow(std::vector<std::filesystem::path> files);
+
+        // HWND of the main window while it exists, so pages can attach FilePickers etc.
         static HWND MainWindowHwnd() { return s_mainHwnd; }
 
-        // Dispatcher for the main (UI) thread. Used by the single-instance
-        // activation handler to marshal redirected uploads onto the UI thread,
-        // since ClipboardHelper requires it.
+        // Dispatcher for the UI thread; redirected activations arrive on a background thread.
         static winrt::Microsoft::UI::Dispatching::DispatcherQueue MainDispatcher() { return s_dispatcher; }
 
-        // Invoked for a redirected activation from a second launch. Parses the
-        // command line from the activation args and triggers an upload.
+        // Invoked for a redirected activation from a second launch: files open a send
+        // window, a plain launch brings up the main window.
         static void HandleRedirectedActivation(
             winrt::Microsoft::Windows::AppLifecycle::AppActivationArguments const& args);
 
@@ -35,10 +37,12 @@ namespace winrt::Fling::implementation
         static HWND s_mainHwnd;
         static winrt::Microsoft::UI::Dispatching::DispatcherQueue s_dispatcher;
 
-        winrt::Microsoft::UI::Xaml::Window m_window{ nullptr };
+        static winrt::Fling::MainWindow s_mainWindow;
+        static std::vector<winrt::Fling::SendWindow> s_sendWindows;
         std::unique_ptr<Aws::SDKOptions> m_awsOptions;
         bool m_awsInitialized{ false };
 
+        static std::vector<std::filesystem::path> FilesFromArguments(std::wstring const& commandLine, bool skipProgramName);
         void InitializeAwsSdk();
         void ShutdownAwsSdk();
         void RegisterAppNotifications();

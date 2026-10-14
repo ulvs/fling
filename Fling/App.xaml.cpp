@@ -1,8 +1,8 @@
 #include "pch.h"
 #include "App.xaml.h"
 #include "MainWindow.xaml.h"
+#include "SendWindow.xaml.h"
 #include "Core/ConfigManager.h"
-#include "Core/UploadCoordinator.h"
 #include <microsoft.ui.xaml.window.h>
 
 #if __has_include("App.g.cpp")
@@ -19,6 +19,8 @@ namespace winrt::Fling::implementation
 {
     HWND App::s_mainHwnd = nullptr;
     winrt::Microsoft::UI::Dispatching::DispatcherQueue App::s_dispatcher{ nullptr };
+    winrt::Fling::MainWindow App::s_mainWindow{ nullptr };
+    std::vector<winrt::Fling::SendWindow> App::s_sendWindows;
 
     App::App()
     {
@@ -44,20 +46,17 @@ namespace winrt::Fling::implementation
 
     void App::OnLaunched(LaunchActivatedEventArgs const&)
     {
-        m_window = make<MainWindow>();
-
-        if (auto native = m_window.try_as<IWindowNative>())
-        {
-            native->get_WindowHandle(&s_mainHwnd);
-        }
-
         s_dispatcher = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
 
-        m_window.Activate();
-
-        // Process any files passed on the command line (context-menu activation).
-        // Done after the window is up so toast/clipboard have a live app to post to.
-        ProcessCommandLineArgs();
+        auto files = FilesFromArguments(GetCommandLineW(), /*skipProgramName=*/true);
+        if (files.empty())
+        {
+            ShowMainWindow();
+        }
+        else
+        {
+            ShowSendWindow(std::move(files));
+        }
     }
 
     void App::HandleRedirectedActivation(
@@ -69,74 +68,94 @@ namespace winrt::Fling::implementation
         }
 
         using namespace winrt::Microsoft::Windows::AppLifecycle;
-        if (args.Kind() != ExtendedActivationKind::Launch)
+        std::wstring argText;
+        if (args.Kind() == ExtendedActivationKind::Launch)
         {
-            return;
+            if (auto launch = args.Data().try_as<winrt::Microsoft::UI::Xaml::LaunchActivatedEventArgs>())
+            {
+                argText = launch.Arguments();
+            }
         }
 
-        auto launch = args.Data().try_as<winrt::Microsoft::UI::Xaml::LaunchActivatedEventArgs>();
-        if (!launch)
-        {
-            return;
-        }
-
-        std::wstring argText(launch.Arguments());
-        if (argText.empty())
-        {
-            return;
-        }
-
-        // Marshal onto the UI thread. Clipboard access in UploadCoordinator
-        // requires it, and we also want upload-completion toasts to appear
-        // ordered with any UI work the user is doing.
+        // Activated fires on a background thread; windows must be created on the UI thread.
         s_dispatcher.TryEnqueue([argText]()
         {
-            int argc = 0;
-            LPWSTR* argv = CommandLineToArgvW(argText.c_str(), &argc);
-            if (!argv)
+            auto files = FilesFromArguments(argText, /*skipProgramName=*/false);
+            if (files.empty())
             {
-                return;
+                ShowMainWindow();
             }
-            for (int i = 0; i < argc; ++i)
+            else
             {
-                std::wstring arg(argv[i]);
-                if (!arg.empty() && arg[0] != L'-' && std::filesystem::exists(arg))
-                {
-                    ::Fling::Core::UploadCoordinator::UploadAndShare(std::filesystem::path(arg));
-                }
+                ShowSendWindow(std::move(files));
             }
-            LocalFree(argv);
         });
     }
 
-    void App::ProcessCommandLineArgs()
+    std::vector<std::filesystem::path> App::FilesFromArguments(std::wstring const& commandLine, bool skipProgramName)
     {
-        // Get command line arguments
-        int argc = 0;
-        LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-
-        if (argv != nullptr)
+        std::vector<std::filesystem::path> files;
+        if (commandLine.empty())
         {
-            // Skip first arg (executable path), process file paths
-            for (int i = 1; i < argc; ++i)
-            {
-                std::wstring arg(argv[i]);
-                if (!arg.empty() && arg[0] != L'-')
-                {
-                    ProcessFilePath(arg);
-                }
-            }
-            LocalFree(argv);
+            return files;
         }
+
+        int argc = 0;
+        LPWSTR* argv = CommandLineToArgvW(commandLine.c_str(), &argc);
+        if (!argv)
+        {
+            return files;
+        }
+        for (int i = skipProgramName ? 1 : 0; i < argc; ++i)
+        {
+            std::wstring arg(argv[i]);
+            std::error_code ec;
+            // Options (including the toast activation marker) start with '-'.
+            if (!arg.empty() && arg[0] != L'-' && std::filesystem::is_regular_file(arg, ec))
+            {
+                files.emplace_back(arg);
+            }
+        }
+        LocalFree(argv);
+        return files;
     }
 
-    void App::ProcessFilePath(std::wstring const& filePath)
+    void App::ShowMainWindow(hstring const& page)
     {
-        if (!std::filesystem::exists(filePath))
+        if (!s_mainWindow)
         {
-            return;
+            s_mainWindow = make<MainWindow>();
+            s_mainWindow.as<IWindowNative>()->get_WindowHandle(&s_mainHwnd);
+            s_mainWindow.Closed([](auto&&, auto&&)
+            {
+                s_mainWindow = nullptr;
+                s_mainHwnd = nullptr;
+            });
         }
-        ::Fling::Core::UploadCoordinator::UploadAndShare(std::filesystem::path(filePath));
+
+        if (!page.empty())
+        {
+            get_self<MainWindow>(s_mainWindow)->SelectPage(page);
+        }
+
+        if (auto presenter = s_mainWindow.AppWindow().Presenter().try_as<winrt::Microsoft::UI::Windowing::OverlappedPresenter>();
+            presenter && presenter.State() == winrt::Microsoft::UI::Windowing::OverlappedPresenterState::Minimized)
+        {
+            presenter.Restore();
+        }
+        s_mainWindow.Activate();
+    }
+
+    void App::ShowSendWindow(std::vector<std::filesystem::path> files)
+    {
+        auto window = make<SendWindow>();
+        s_sendWindows.push_back(window);
+        window.Closed([](IInspectable const& sender, WindowEventArgs const&)
+        {
+            auto closed = sender.as<winrt::Fling::SendWindow>();
+            std::erase(s_sendWindows, closed);
+        });
+        get_self<SendWindow>(window)->Start(std::move(files));
     }
 
     void App::InitializeAwsSdk()

@@ -49,6 +49,19 @@ namespace winrt::Fling::implementation
         RemoveTrayIcon();
     }
 
+    void MainWindow::SelectPage(hstring const& tag)
+    {
+        for (auto const& item : NavView().MenuItems())
+        {
+            auto navItem = item.try_as<NavigationViewItem>();
+            if (navItem && unbox_value_or<hstring>(navItem.Tag(), L"") == tag)
+            {
+                NavView().SelectedItem(navItem);
+                return;
+            }
+        }
+    }
+
     void MainWindow::NavView_SelectionChanged(
         NavigationView const& /*sender*/,
         NavigationViewSelectionChangedEventArgs const& args)

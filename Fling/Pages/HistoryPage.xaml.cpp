@@ -8,6 +8,7 @@
 #include "App.xaml.h"
 #include "Core/HistoryManager.h"
 #include "Core/ClipboardHelper.h"
+#include "Core/Format.h"
 #include "Core/ToastHelper.h"
 #include "Core/UploadCoordinator.h"
 
@@ -40,23 +41,10 @@ using namespace winrt::Microsoft::UI::Xaml::Media;
 using namespace winrt::Microsoft::UI::Xaml::Navigation;
 using namespace ::Fling::Core;
 
+using ::Fling::Core::FormatSize;
+
 namespace
 {
-    std::wstring FormatSize(uint64_t bytes)
-    {
-        constexpr double kb = 1024.0;
-        constexpr double mb = kb * 1024.0;
-        constexpr double gb = mb * 1024.0;
-
-        std::wostringstream os;
-        os << std::fixed << std::setprecision(1);
-        if (bytes >= gb)       os << (bytes / gb) << L" GB";
-        else if (bytes >= mb)  os << (bytes / mb) << L" MB";
-        else if (bytes >= kb)  os << (bytes / kb) << L" KB";
-        else                   os << bytes << L" B";
-        return os.str();
-    }
-
     std::wstring FormatDate(int64_t epochSeconds)
     {
         if (epochSeconds <= 0) return L"—";

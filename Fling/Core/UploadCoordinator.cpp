@@ -4,22 +4,19 @@
 #include "ClipboardHelper.h"
 #include "ConfigManager.h"
 #include "HistoryManager.h"
-#include "S3Uploader.h"
 #include "ToastHelper.h"
 
 using namespace Fling::Models;
 
 namespace Fling::Core
 {
-    UploadOutcome UploadCoordinator::UploadAndShare(std::filesystem::path const& filePath)
+    UploadOutcome UploadCoordinator::Upload(std::filesystem::path const& filePath, ProgressCallback progress)
     {
         UploadOutcome out;
-        auto fileName = filePath.filename().wstring();
 
         if (!std::filesystem::exists(filePath))
         {
             out.errorMessage = L"File not found: " + filePath.wstring();
-            ToastHelper::ShowUploadError(fileName, out.errorMessage);
             return out;
         }
 
@@ -27,7 +24,6 @@ namespace Fling::Core
         if (!cm.IsConfigured())
         {
             out.errorMessage = L"Fling is not configured. Open Settings to add your S3 credentials.";
-            ToastHelper::ShowUploadError(fileName, out.errorMessage);
             return out;
         }
 
@@ -41,11 +37,10 @@ namespace Fling::Core
         }
 
         S3Uploader uploader(config);
-        auto result = uploader.Upload(filePath);
+        auto result = uploader.Upload(filePath, std::move(progress));
 
-        HistoryManager hm;
+        auto fileName = filePath.filename().wstring();
         UploadEntry entry;
-
         if (result.success)
         {
             entry = UploadEntry::CreateSuccess(
@@ -55,25 +50,32 @@ namespace Fling::Core
                 result.presignedUrl,
                 fileSize,
                 config.expirySeconds);
-
-            ClipboardHelper::CopyToClipboard(result.presignedUrl);
-            ToastHelper::ShowUploadSuccess(fileName, result.presignedUrl);
-
             out.success = true;
             out.url = result.presignedUrl;
         }
         else
         {
-            entry = UploadEntry::CreateFailure(
-                fileName,
-                filePath.wstring(),
-                result.errorMessage);
-
-            ToastHelper::ShowUploadError(fileName, result.errorMessage);
+            entry = UploadEntry::CreateFailure(fileName, filePath.wstring(), result.errorMessage);
             out.errorMessage = result.errorMessage;
         }
 
-        hm.AddEntry(entry);
+        HistoryManager().AddEntry(entry);
+        return out;
+    }
+
+    UploadOutcome UploadCoordinator::UploadAndShare(std::filesystem::path const& filePath)
+    {
+        auto out = Upload(filePath);
+        auto fileName = filePath.filename().wstring();
+        if (out.success)
+        {
+            ClipboardHelper::CopyToClipboard(out.url);
+            ToastHelper::ShowUploadSuccess(fileName, out.url);
+        }
+        else
+        {
+            ToastHelper::ShowUploadError(fileName, out.errorMessage);
+        }
         return out;
     }
 }

@@ -13,6 +13,7 @@
         <NavigationView x:Name="NavView"
                         PaneDisplayMode="Left"
                         IsBackButtonVisible="Collapsed"
+                        IsSettingsVisible="False"
                         SelectionChanged="NavView_SelectionChanged">
             <NavigationView.MenuItems>
                 <NavigationViewItem Icon="Setting" Content="Settings" Tag="settings"/>

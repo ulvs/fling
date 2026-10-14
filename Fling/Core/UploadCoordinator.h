@@ -1,4 +1,5 @@
 #pragma once
+#include "S3Uploader.h"
 #include <filesystem>
 #include <string>
 
@@ -11,14 +12,14 @@ namespace Fling::Core
         std::wstring errorMessage;
     };
 
-    // Orchestrates a single file upload:
-    //   config -> S3Uploader -> clipboard + toast + history.
-    // Intended to be called from either a CLI activation path or a UI handler.
-    // Synchronous: blocks until the upload completes. Callers on a UI thread
-    // should move this to a worker if freezing the window matters.
     class UploadCoordinator
     {
     public:
+        // Config check -> S3 upload -> history entry. Blocking and thread-agnostic:
+        // no clipboard or toast, so it can run on a worker thread.
+        static UploadOutcome Upload(std::filesystem::path const& filePath, ProgressCallback progress = nullptr);
+
+        // Upload() plus clipboard copy and a toast. Clipboard needs the UI thread.
         static UploadOutcome UploadAndShare(std::filesystem::path const& filePath);
     };
 }
