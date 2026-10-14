@@ -250,6 +250,9 @@ namespace Fling::Core
 
         Aws::Transfer::TransferManagerConfiguration transferConfig(executor.get());
         transferConfig.s3Client = m_client;
+        // TransferManager sets CRC64NVME on every multipart request regardless of the client's
+        // WHEN_REQUIRED setting; Backblaze B2 and Cloudflare R2 reject those headers.
+        transferConfig.checksumAlgorithm = Aws::S3::Model::ChecksumAlgorithm::NOT_SET;
 
         if (progressCallback)
         {
