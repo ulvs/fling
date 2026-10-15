@@ -10,6 +10,7 @@
 
 #include <filesystem>
 #include <string>
+#include <mutex>
 #include <vector>
 
 using Microsoft::WRL::ClassicCom;
@@ -90,11 +91,40 @@ namespace
         return S_OK;
     }
 
-    bool HostIsExplorer()
+    // Windows merges FlingShareCommand into classic menus (Total Commander, "Show more options"),
+    // where FlingClassicMenu also adds an entry. Both run in the same COM surrogate, and the classic
+    // handler is queried first, so it records what it added for and the command hides itself
+    // for that same selection. Explorer's Windows 11 menu never queries the classic handler.
+    std::mutex g_classicMutex;
+    std::wstring g_classicFirstPath;
+    ULONGLONG g_classicTick = 0;
+    constexpr ULONGLONG kSameMenuMs = 3000;
+
+    void NoteClassicEntry(std::wstring const& firstPath)
     {
-        wchar_t path[MAX_PATH]{};
-        GetModuleFileNameW(nullptr, path, MAX_PATH);
-        return _wcsicmp(PathFindFileNameW(path), L"explorer.exe") == 0;
+        std::lock_guard lock(g_classicMutex);
+        g_classicFirstPath = firstPath;
+        g_classicTick = GetTickCount64();
+    }
+
+    bool ClassicEntryShownFor(std::wstring const& firstPath)
+    {
+        std::lock_guard lock(g_classicMutex);
+        return !firstPath.empty() && _wcsicmp(firstPath.c_str(), g_classicFirstPath.c_str()) == 0
+            && GetTickCount64() - g_classicTick < kSameMenuMs;
+    }
+
+    std::wstring FirstPath(IShellItemArray* items)
+    {
+        ComPtr<IShellItem> item;
+        PWSTR path{};
+        std::wstring result;
+        if (items && SUCCEEDED(items->GetItemAt(0, &item)) && SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)))
+        {
+            result = path;
+            CoTaskMemFree(path);
+        }
+        return result;
     }
 }
 
@@ -125,10 +155,9 @@ public:
         return S_OK;
     }
 
-    IFACEMETHODIMP GetState(IShellItemArray*, BOOL, EXPCMDSTATE* state) override
+    IFACEMETHODIMP GetState(IShellItemArray* items, BOOL, EXPCMDSTATE* state) override
     {
-        // Other hosts (some Windows builds merge this into their classic menu) get FlingClassicMenu instead.
-        *state = HostIsExplorer() ? ECS_ENABLED : ECS_HIDDEN;
+        *state = ClassicEntryShownFor(FirstPath(items)) ? ECS_HIDDEN : ECS_ENABLED;
         return S_OK;
     }
 
@@ -173,8 +202,8 @@ public:
     }
 };
 
-// Classic IContextMenu entry for every host except Explorer (Total Commander, other file managers).
-// Exactly one of the two classes shows the entry in any host.
+// Classic IContextMenu entry for file managers such as Total Commander. See NoteClassicEntry for
+// how it and FlingShareCommand avoid showing the entry twice.
 class __declspec(uuid("797BAD2C-1AE6-4D15-B7D1-82DC7868E6D3")) FlingClassicMenu final
     : public RuntimeClass<RuntimeClassFlags<ClassicCom>, IShellExtInit, IContextMenu>
 {
@@ -211,11 +240,12 @@ public:
 
     IFACEMETHODIMP QueryContextMenu(HMENU menu, UINT index, UINT firstId, UINT, UINT flags) override
     {
-        if ((flags & CMF_DEFAULTONLY) || m_paths.empty() || HostIsExplorer())
+        if ((flags & CMF_DEFAULTONLY) || m_paths.empty())
         {
             return MAKE_HRESULT(SEVERITY_SUCCESS, 0, 0);
         }
         InsertMenuW(menu, index, MF_BYPOSITION | MF_STRING, firstId, kTitle);
+        NoteClassicEntry(m_paths.front());
         return MAKE_HRESULT(SEVERITY_SUCCESS, 0, 1);
     }
 

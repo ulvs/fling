@@ -14,7 +14,7 @@
   <Identity
     Name="FlingApp.Fling"
     Publisher="CN=FlingApp"
-    Version="0.3.2.0" />
+    Version="0.3.3.0" />
 
   <Properties>
     <DisplayName>Fling</DisplayName>
@@ -59,7 +59,7 @@
         </desktop4:Extension>
 
         <!-- Classic menu handler, for file managers that build the classic menu (Total Commander).
-             It skips itself inside Explorer, and the entry above hides itself everywhere else. -->
+             FlingShellExt makes sure only one of the two shows in any menu. -->
         <desktop9:Extension Category="windows.fileExplorerClassicContextMenuHandler">
           <desktop9:FileExplorerClassicContextMenuHandler>
             <desktop9:ExtensionHandler Type="*" Clsid="797BAD2C-1AE6-4D15-B7D1-82DC7868E6D3"/>
