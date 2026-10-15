@@ -14,6 +14,7 @@ namespace Fling::Models
         int expirySeconds{ 604800 };    // Presigned URL expiry (default 7 days)
         bool usePathStyle{ false };     // Use path-style addressing (required for MinIO)
         std::wstring keyPrefix;         // Optional prefix prepended to every S3 key
+        bool zipMultiple{ true };       // Several files shared at once go into one zip (folders are always zipped)
 
         // Check if configuration is complete enough to attempt uploads
         bool IsConfigured() const
@@ -79,6 +80,9 @@ namespace Fling::Models
         if (j.contains("keyPrefix") && j["keyPrefix"].is_string())
             config.keyPrefix = Utf8ToWide(j["keyPrefix"].get<std::string>());
 
+        if (j.contains("zipMultipleFiles") && j["zipMultipleFiles"].is_boolean())
+            config.zipMultiple = j["zipMultipleFiles"].get<bool>();
+
         return config;
     }
 
@@ -92,7 +96,8 @@ namespace Fling::Models
             {"secretKey", WideToUtf8(secretKey)},
             {"expirySeconds", expirySeconds},
             {"usePathStyle", usePathStyle},
-            {"keyPrefix", WideToUtf8(keyPrefix)}
+            {"keyPrefix", WideToUtf8(keyPrefix)},
+            {"zipMultipleFiles", zipMultiple}
         };
     }
 

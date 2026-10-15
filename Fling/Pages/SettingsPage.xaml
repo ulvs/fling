@@ -56,6 +56,20 @@
                     </StackPanel>
                 </Border>
 
+                <Border Style="{StaticResource FlingCardStyle}">
+                    <StackPanel Spacing="{StaticResource FlingSpace4}">
+                        <StackPanel Spacing="{StaticResource FlingSpace1}">
+                            <TextBlock Text="Sharing several items" Style="{StaticResource FlingLabelTextStyle}"/>
+                            <TextBlock Style="{StaticResource FlingCaptionTextStyle}"
+                                       Text="Folders are always zipped. Choose what happens when you share more than one item at once."/>
+                        </StackPanel>
+                        <RadioButtons x:Name="MultipleChoice">
+                            <RadioButton Content="One zip file with one link"/>
+                            <RadioButton Content="A separate link for each file"/>
+                        </RadioButtons>
+                    </StackPanel>
+                </Border>
+
                 <StackPanel Spacing="{StaticResource FlingSpace4}">
                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource FlingSpace2}">
                         <Button x:Name="SaveButton" Content="Save"

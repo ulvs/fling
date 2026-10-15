@@ -12,7 +12,7 @@ Plan phases (from [fling-project-plan.md](fling-project-plan.md)):
 |---|---|
 | 1 — Project setup & vcpkg | ✅ Done |
 | 2 — Core library (ConfigManager, S3Uploader, HistoryManager, helpers) | ✅ Done |
-| 3 — Explorer integration | 🟡 MSIX package + Windows 11 "Share with Fling" context menu (`FlingShellExt.dll`) landed; release signing not done |
+| 3 — Explorer integration | 🟡 MSIX package + Windows 11 "Fling it" context menu (`FlingShellExt.dll`) landed; release signing not done |
 | 4 — WinUI 3 app | 🟡 Fling design system applied (theme, logos, icons). Main window: Uploads (drop zone + recent uploads) and Settings; compact SendWindow with one TransferRow per file; tray icon scaffolded but not called |
 | 5 — Polish (multi-file, drag-drop, TransferManager, creds) | ⏳ Not started |
 
@@ -85,6 +85,8 @@ Get-AppxPackage FlingApp.Fling | Remove-AppxPackage
 
 6. **Single-instance hand-off:** the redirecting process runs `RedirectActivationToAsync` on a worker thread and pumps with `CoWaitForMultipleObjects` (blocking the STA deadlocks it), and the running instance reads `Windows.ApplicationModel.Activation.ILaunchActivatedEventArgs` (not the XAML type). Both were broken before 2026-10-14, so sharing while Fling was open never worked.
 7. **Launch routing:** `App::OnLaunched` / `HandleRedirectedActivation` open a `SendWindow` when the command line has files, otherwise the main window (created lazily, `App::ShowMainWindow(page)`). The process ends when the last window closes, so `SendWindow` hides instead of closing while an upload runs and reports by toast.
+9. **Several items / folders:** a lone file uploads as-is; folders are always zipped (`<folder>.zip`); several items become one `flung-YYYY-MM-DD-HHMM.zip` unless Settings has "A separate link for each file" (`zipMultipleFiles` in config.json). Already-compressed formats are stored, not deflated. The temp zip is deleted after the upload attempt.
+10. **Two context-menu handlers, one "Fling it" entry:** `FlingShareCommand` (IExplorerCommand, Windows 11 top-level menu) reports `ECS_HIDDEN` outside explorer.exe; `FlingClassicMenu` (IContextMenu, registered via `desktop9:FileExplorerClassicContextMenuHandler`) skips itself inside explorer.exe. Total Commander and other file managers therefore see exactly one entry, whether or not the Windows build merges packaged verbs into classic menus.
 8. **Sources are compiled with `/utf-8`.** Without it MSVC reads UTF-8 files as Windows-1252 and every non-ASCII literal (`·`, `…`, icon glyphs) turns into mojibake.
 ---
 
@@ -97,6 +99,7 @@ Fling/
   MainWindow.xaml(.h/.cpp/.idl)    NavigationView + tray icon scaffolding
   SendWindow.xaml(.h/.cpp/.idl)    Small always-on-top upload window for file launches (bottom-right, auto-closes on success)
   Controls/                        TransferRow, DropZone, FlingToast (design-system UserControls)
+  Core/ArchiveBuilder.cpp          Zips folders / several items (minizip-ng, static) into %TEMP%\Fling\<id>\
   Design/                          Theme, tokens, logos, component specs (see CLAUDE.md "Design system")
   Pages/
     SettingsPage.xaml(.h/.cpp/.idl)  S3 creds + Test connection
@@ -122,7 +125,7 @@ Tests in `Fling.Tests/` — gtest 1.17 from vcpkg (own `TestMain.cpp`, since `gt
 ## Known TODOs (by priority)
 
 ### Next
-- Verify end to end with the packaged app: right-click a file → "Share with Fling" → URL on clipboard + toast + History entry. Check Settings shows the pre-MSIX config (AppData virtualization).
+- Verify end to end with the packaged app: right-click a file → "Fling it" → URL on clipboard + toast + History entry. Check Settings shows the pre-MSIX config (AppData virtualization).
 - Release signing: self-signed `CN=FlingApp` is fine for local installs, but GitHub Releases users would have to trust the cert manually. Options: a real code-signing cert (e.g. Azure Trusted Signing) or Store-only distribution (the Store re-signs).
 
 ### Phase 4 polish

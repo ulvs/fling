@@ -112,7 +112,7 @@ namespace winrt::Fling::implementation
             std::wstring arg(argv[i]);
             std::error_code ec;
             // Options (including the toast activation marker) start with '-'.
-            if (!arg.empty() && arg[0] != L'-' && std::filesystem::is_regular_file(arg, ec))
+            if (!arg.empty() && arg[0] != L'-' && (std::filesystem::is_regular_file(arg, ec) || std::filesystem::is_directory(arg, ec)))
             {
                 files.emplace_back(arg);
             }

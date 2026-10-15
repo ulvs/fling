@@ -121,6 +121,7 @@
       <DependentUpon>SendWindow.xaml</DependentUpon>
     </ClInclude>
     <ClInclude Include="Core\Format.h" />
+    <ClInclude Include="Core\ArchiveBuilder.h" />
     <ClInclude Include="Core\S3Uploader.h" />
     <ClInclude Include="Core\ConfigManager.h" />
     <ClInclude Include="Core\HistoryManager.h" />
@@ -166,6 +167,7 @@
     <ClCompile Include="Core\ClipboardHelper.cpp" />
     <ClCompile Include="Core\ToastHelper.cpp" />
     <ClCompile Include="Core\UploadCoordinator.cpp" />
+    <ClCompile Include="Core\ArchiveBuilder.cpp" />
     <ClCompile Include="Pages\SettingsPage.xaml.cpp">
       <DependentUpon>Pages\SettingsPage.xaml</DependentUpon>
     </ClCompile>

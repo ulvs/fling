@@ -104,6 +104,8 @@
     <ClCompile Include="..\Fling\Core\ConfigManager.cpp" />
     <ClCompile Include="..\Fling\Core\HistoryManager.cpp" />
     <ClCompile Include="..\Fling\Core\S3Uploader.cpp" />
+    <ClCompile Include="..\Fling\Core\ArchiveBuilder.cpp" />
+    <ClCompile Include="ArchiveBuilderTests.cpp" />
   </ItemGroup>
 
 

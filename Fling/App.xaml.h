@@ -19,7 +19,7 @@ namespace winrt::Fling::implementation
         // Main window (Uploads/Settings), created on first use. page: "uploads", "settings" or empty.
         static void ShowMainWindow(hstring const& page = L"");
 
-        // Compact window that uploads the given files (Explorer "Share with Fling").
+        // Compact window that uploads the given files (Explorer "Fling it").
         static void ShowSendWindow(std::vector<std::filesystem::path> files);
 
         // HWND of the main window while it exists, so pages can attach FilePickers etc.

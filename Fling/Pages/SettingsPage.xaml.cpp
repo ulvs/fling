@@ -47,6 +47,7 @@ namespace winrt::Fling::implementation
         SecretKeyPasswordBox().Password(hstring(config.secretKey));
         ExpiryNumberBox().Value(std::clamp(std::round(config.expirySeconds / double(kSecondsPerDay)), 1.0, 7.0));
         PathStyleCheckBox().IsChecked(config.usePathStyle);
+        MultipleChoice().SelectedIndex(config.zipMultiple ? 0 : 1);
     }
 
     FlingConfig SettingsPage::ReadForm()
@@ -67,6 +68,7 @@ namespace winrt::Fling::implementation
 
         auto checked = PathStyleCheckBox().IsChecked();
         config.usePathStyle = checked && checked.Value();
+        config.zipMultiple = MultipleChoice().SelectedIndex() != 1;
         return config;
     }
 

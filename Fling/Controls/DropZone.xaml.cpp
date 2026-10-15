@@ -55,7 +55,7 @@ namespace winrt::Fling::implementation
         std::vector<std::filesystem::path> files;
         for (auto const& item : items)
         {
-            if (item.IsOfType(StorageItemTypes::File))
+            if (item.IsOfType(StorageItemTypes::File) || item.IsOfType(StorageItemTypes::Folder))
             {
                 files.emplace_back(std::wstring(item.Path()));
             }

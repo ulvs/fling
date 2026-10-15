@@ -14,6 +14,13 @@
       "default-features": false
     },
     "nlohmann-json",
-    "gtest"
+    "gtest",
+    {
+      "name": "minizip-ng",
+      "default-features": false,
+      "features": [
+        "zlib"
+      ]
+    }
   ]
 }

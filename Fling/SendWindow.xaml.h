@@ -7,13 +7,13 @@
 
 namespace winrt::Fling::implementation
 {
-    // Compact always-on-top window shown for Explorer "Share with Fling" launches and drops:
-    // one TransferRow per file.
+    // Compact always-on-top window shown for "Fling it" launches and drops:
+    // one TransferRow per upload (a file, or a zip of several items).
     struct SendWindow : SendWindowT<SendWindow>
     {
         SendWindow();
 
-        void Start(std::vector<std::filesystem::path> files);
+        void Start(std::vector<std::filesystem::path> items);
 
         void InfoButton_Click(winrt::Windows::Foundation::IInspectable const&, winrt::Microsoft::UI::Xaml::RoutedEventArgs const&);
         void SettingsButton_Click(winrt::Windows::Foundation::IInspectable const&, winrt::Microsoft::UI::Xaml::RoutedEventArgs const&);
@@ -24,7 +24,10 @@ namespace winrt::Fling::implementation
     private:
         struct Job
         {
-            std::filesystem::path path;
+            std::wstring name;
+            std::filesystem::path path;                  // the file to upload (empty for archives until zipped)
+            bool archive{ false };
+            std::vector<std::filesystem::path> sources;  // what goes into the zip
             uint64_t size{ 0 };
             winrt::Fling::TransferRow row{ nullptr };
             bool succeeded{ false };

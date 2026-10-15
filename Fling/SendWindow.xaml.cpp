@@ -7,6 +7,7 @@
 
 #include "App.xaml.h"
 #include "Controls/TransferRow.xaml.h"
+#include "Core/ArchiveBuilder.h"
 #include "Core/ClipboardHelper.h"
 #include "Core/ConfigManager.h"
 #include "Core/Format.h"
@@ -114,20 +115,62 @@ namespace winrt::Fling::implementation
         appWindow.MoveAndResize({ area.X + area.Width - width - margin, area.Y + area.Height - height - margin, width, height });
     }
 
-    void SendWindow::Start(std::vector<std::filesystem::path> files)
+    void SendWindow::Start(std::vector<std::filesystem::path> items)
     {
-        auto bucket = ::Fling::Core::ConfigManager().Load().bucket;
+        using ::Fling::Core::ArchiveBuilder;
+        auto config = ::Fling::Core::ConfigManager().Load();
+        std::error_code ec;
 
-        for (size_t i = 0; i < files.size(); ++i)
+        // A lone file goes as-is and folders are always zipped. Several items become one zip
+        // unless the user chose separate links in Settings.
+        std::vector<Job> jobs;
+        auto addFile = [&](std::filesystem::path const& file)
         {
             Job job;
-            job.path = files[i];
-            std::error_code ec;
-            job.size = std::filesystem::file_size(job.path, ec);
+            job.path = file;
+            job.name = file.filename().wstring();
+            job.size = std::filesystem::file_size(file, ec);
+            jobs.push_back(std::move(job));
+        };
+        auto addArchive = [&](std::vector<std::filesystem::path> sources)
+        {
+            Job job;
+            job.archive = true;
+            job.name = ArchiveBuilder::ArchiveName(sources);
+            job.size = ArchiveBuilder::TotalSize(sources);
+            job.sources = std::move(sources);
+            jobs.push_back(std::move(job));
+        };
 
+        if (items.size() == 1 && std::filesystem::is_regular_file(items[0], ec))
+        {
+            addFile(items[0]);
+        }
+        else if (config.zipMultiple || items.size() == 1)
+        {
+            addArchive(items);
+        }
+        else
+        {
+            for (auto const& item : items)
+            {
+                if (std::filesystem::is_directory(item, ec))
+                {
+                    addArchive({ item });
+                }
+                else
+                {
+                    addFile(item);
+                }
+            }
+        }
+
+        for (size_t i = 0; i < jobs.size(); ++i)
+        {
+            auto& job = jobs[i];
             job.row = winrt::Fling::TransferRow();
             auto row = get_self<TransferRow>(job.row);
-            row->SetFile(job.path.filename().wstring(), bucket);
+            row->SetFile(job.name, config.bucket);
             row->ShowWaiting(::Fling::Core::FormatSize(job.size) + kSep + L"Waiting");
             row->ActionInvoked = [weak = get_weak(), i]
             {
@@ -137,10 +180,12 @@ namespace winrt::Fling::implementation
                 }
             };
             Rows().Children().Append(job.row);
-            m_jobs.push_back(std::move(job));
         }
+        m_jobs = std::move(jobs);
 
-        TitleText().Text(hstring(L"Uploading " + Count(m_jobs.size(), L"file", L"files")));
+        TitleText().Text(hstring(m_jobs.size() == 1
+            ? L"Uploading " + m_jobs[0].name
+            : L"Uploading " + Count(m_jobs.size(), L"file", L"files")));
         PlaceInCorner(m_jobs.size());
         Activate();
         RunAll();
@@ -157,7 +202,56 @@ namespace winrt::Fling::implementation
         {
             m_autoCloseTimer.Stop();
         }
-        auto path = m_jobs[index].path;
+
+        std::filesystem::path path = m_jobs[index].path;
+        bool archive = m_jobs[index].archive;
+        if (archive)
+        {
+            get_self<TransferRow>(m_jobs[index].row)->ShowSending(0.0, std::wstring(L"Zipping") + kSep + L"0%");
+            StatusText().Text(L"Zipping\u2026");
+
+            auto zipPercent = std::make_shared<std::atomic<int>>(-1);
+            auto zipProgress = [weak = get_weak(), dispatcher, zipPercent, index](uint64_t done, uint64_t total)
+            {
+                if (total == 0)
+                {
+                    return;
+                }
+                double fraction = static_cast<double>(done) / static_cast<double>(total);
+                int percent = static_cast<int>(fraction * 100.0);
+                if (zipPercent->exchange(percent) == percent)
+                {
+                    return;
+                }
+                std::wstring detail = std::wstring(L"Zipping") + kSep + std::to_wstring(percent) + L"%";
+                dispatcher.TryEnqueue([weak, index, fraction, detail]
+                {
+                    if (auto self = weak.get())
+                    {
+                        get_self<TransferRow>(self->m_jobs[index].row)->ShowSending(fraction, detail);
+                    }
+                });
+            };
+
+            auto sources = m_jobs[index].sources;
+            auto name = m_jobs[index].name;
+            co_await resume_background();
+            auto built = ::Fling::Core::ArchiveBuilder::Build(sources, name, zipProgress);
+            co_await uiThread;
+
+            if (!built.success)
+            {
+                --m_active;
+                m_jobs[index].succeeded = false;
+                m_jobs[index].error = built.errorMessage;
+                get_self<TransferRow>(m_jobs[index].row)->ShowFailed(built.errorMessage);
+                co_return;
+            }
+            path = built.path;
+            std::error_code ec;
+            m_jobs[index].size = std::filesystem::file_size(path, ec);
+        }
+
         auto sizeText = ::Fling::Core::FormatSize(m_jobs[index].size);
         get_self<TransferRow>(m_jobs[index].row)->ShowSending(0.0, sizeText + kSep + L"0%");
         StatusText().Text(L"Uploading\u2026");
@@ -189,7 +283,7 @@ namespace winrt::Fling::implementation
 
             dispatcher.TryEnqueue([weak, index, fraction, detail]
             {
-                if (auto self = weak.get(); self && self->m_jobs[index].row)
+                if (auto self = weak.get())
                 {
                     get_self<TransferRow>(self->m_jobs[index].row)->ShowSending(fraction, detail);
                 }
@@ -198,6 +292,10 @@ namespace winrt::Fling::implementation
 
         co_await resume_background();
         auto outcome = ::Fling::Core::UploadCoordinator::Upload(path, progress);
+        if (archive)
+        {
+            ::Fling::Core::ArchiveBuilder::Cleanup(path);
+        }
         co_await uiThread;
 
         --m_active;
