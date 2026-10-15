@@ -11,8 +11,7 @@ using namespace Fling::Core;
 using namespace Fling::Models;
 
 // Integration tests require MinIO running locally
-// Run: docker compose up -d
-// Create bucket: visit http://localhost:9001, login minioadmin/minioadmin, create "fling-test"
+// Run: docker compose up -d   (local S3 with bucket "fling-test", see docker-compose.yml)
 
 class S3UploaderIntegrationTests : public ::testing::Test
 {

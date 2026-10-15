@@ -42,12 +42,30 @@ Verified live against MinIO at `https://s3.intebitter.se` / bucket `fling` / use
 # Launch (output layout is per-project now)
 Fling\x64\Debug\Fling\Fling.exe
 
-# Tests (38 unit tests; MinIO integration tests skip unless `docker compose up -d` is running)
+# Tests (46 unit tests; the 9 S3 integration tests skip unless `docker compose up -d` is running)
 "...\MSBuild.exe" Fling.Tests/Fling.Tests.vcxproj -p:Configuration=Debug -p:Platform=x64
 Fling.Tests\x64\Debug\Fling.Tests.exe
+docker compose down -v   # afterwards
 ```
 
 vcpkg's app-local step copies the needed DLLs next to both exes.
+
+The root `docker-compose.yml` runs Versity Gateway (`versity/versitygw`) on port 9000, with bucket `fling-test` and keys `minioadmin`/`minioadmin`. MinIO stopped publishing images on Docker Hub; versitygw is a drop-in that also checks SigV4 signatures.
+
+---
+
+## Gateway (`gateway/`, Go)
+
+The optional org-hosted layer: it holds the S3 key, issues presigned upload URLs and serves revocable `/l/{slug}` links. The plan is in OneDrive (`Fling Gateway plan.md`). Done: M0/M1, which cover config from `FLING_*` env vars, SQLite store, policy (size and TTL limits), uploads, links, revoke, and a dev bearer token. Next: M2, OIDC sign-in (Google + Microsoft) with a member list.
+
+```
+cd gateway
+go test -race ./...
+docker compose -f compose.dev.yml up --build   # gateway on :8080, local S3 on :9000
+# API: Authorization: Bearer dev-token-change-me-0123456789abcdef
+```
+
+CI is `.github/workflows/gateway.yml`. It runs gofmt, vet and race tests. Pushes to `main` also publish `ghcr.io/<owner>/fling-gateway` (amd64 and arm64).
 
 ---
 
@@ -89,6 +107,7 @@ Get-AppxPackage FlingApp.Fling | Remove-AppxPackage
 10. **Two context-menu handlers, one "Fling it" entry:** both run in a COM surrogate (dllhost.exe), so host-process checks are useless. Windows merges `FlingShareCommand` (IExplorerCommand) into classic menus (Total Commander, "Show more options") and queries `FlingClassicMenu` (IContextMenu via `desktop9`) first; the classic handler records the selection it added an entry for and the command reports `ECS_HIDDEN` for that same selection within 3 s. Explorer's Windows 11 menu never queries the classic handler.
 11. **Local log (`Core/Log`):** `LocalState\logs\fling.log` in the package (rolls over at 1 MB, keeps one old file). Settings has "Open log folder" and "Copy diagnostic info". Nothing is sent anywhere. Rules: never log keys, links or file names; describe files with `Log::Describe`/`DescribeType`; `Log::Scrub` strips URL query strings and the user profile path from every line. Crash reports for Store installs come from Windows Error Reporting (Partner Center, Health). Opt-in Sentry is the planned next step if needed.
 8. **Sources are compiled with `/utf-8`.** Without it MSVC reads UTF-8 files as Windows-1252 and every non-ASCII literal (`·`, `…`, icon glyphs) turns into mojibake.
+12. **Upload progress:** PutObject's DataSent handler reports each chunk, not a running total. `UploadSmallFile` adds the chunks up and reports the file size as the total. Before 2026-10-15 the send window's progress for files under 100 MB was wrong.
 ---
 
 ## Code layout
@@ -143,5 +162,5 @@ Tests in `Fling.Tests/` — gtest 1.17 from vcpkg (own `TestMain.cpp`, since `gt
 
 ## Git
 
-- Branches: `main`; `upgrade-winappsdk-2` (WinAppSDK 2.5.1 / CppWinRT 3.0); `msix-packaging` (on top of the upgrade)
+- Branches: `main`; `gateway` (Fling Gateway, Go)
 - Remote: `https://github.com/ulvs/fling.git`

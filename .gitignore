@@ -113,3 +113,6 @@ TestResults/
 
 # Sideload packages
 dist/
+
+# Go module files (the *.mod rule above is for Fortran)
+!go.mod

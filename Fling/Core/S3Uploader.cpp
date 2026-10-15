@@ -214,14 +214,24 @@ namespace Fling::Core
 
         if (progressCallback)
         {
+            // The SDK reports each chunk as it is written, not a running total.
+            std::error_code ec;
+            uint64_t total = std::filesystem::file_size(filePath, ec);
+            if (ec)
+            {
+                total = 0;
+            }
+            auto sent = std::make_shared<std::atomic<uint64_t>>(0);
             request.SetDataSentEventHandler(
-                [progressCallback, this](
+                [progressCallback, sent, total, this](
                     Aws::Http::HttpRequest const*,
                     long long bytesSent)
                 {
                     if (!m_cancelled)
                     {
-                        progressCallback(static_cast<uint64_t>(bytesSent), 0);
+                        auto soFar = sent->fetch_add(static_cast<uint64_t>(bytesSent)) +
+                            static_cast<uint64_t>(bytesSent);
+                        progressCallback(total ? std::min(soFar, total) : soFar, total);
                     }
                 });
             request.SetContinueRequestHandler(
