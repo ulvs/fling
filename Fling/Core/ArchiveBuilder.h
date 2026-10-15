@@ -12,7 +12,8 @@ namespace Fling::Core
     {
         bool success{ false };
         std::filesystem::path path;
-        std::wstring errorMessage;
+        std::wstring errorMessage;            // for the user; may contain a file name
+        std::filesystem::path failedFile;      // the entry that couldn't be added, if any
     };
 
     class ArchiveBuilder

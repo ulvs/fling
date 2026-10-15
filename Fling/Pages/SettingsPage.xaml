@@ -70,6 +70,22 @@
                     </StackPanel>
                 </Border>
 
+                <Border Style="{StaticResource FlingCardStyle}">
+                    <StackPanel Spacing="{StaticResource FlingSpace4}">
+                        <StackPanel Spacing="{StaticResource FlingSpace1}">
+                            <TextBlock Text="Troubleshooting" Style="{StaticResource FlingLabelTextStyle}"/>
+                            <TextBlock Style="{StaticResource FlingCaptionTextStyle}"
+                                       Text="Fling keeps a small log on this PC. Nothing is sent anywhere. Add it when you report a problem; it never contains your keys, links or file names."/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource FlingSpace2}">
+                            <Button Content="Open log folder" Style="{StaticResource FlingSecondaryButtonStyle}"
+                                    Click="OpenLogFolder_Click"/>
+                            <Button Content="Copy diagnostic info" Style="{StaticResource FlingQuietButtonStyle}"
+                                    Click="CopyDiagnostics_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <StackPanel Spacing="{StaticResource FlingSpace4}">
                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource FlingSpace2}">
                         <Button x:Name="SaveButton" Content="Save"

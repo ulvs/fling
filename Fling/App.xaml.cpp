@@ -3,6 +3,7 @@
 #include "MainWindow.xaml.h"
 #include "SendWindow.xaml.h"
 #include "Core/ConfigManager.h"
+#include "Core/Log.h"
 #include <microsoft.ui.xaml.window.h>
 
 #if __has_include("App.g.cpp")
@@ -24,19 +25,20 @@ namespace winrt::Fling::implementation
 
     App::App()
     {
+        ::Fling::Core::Log::Info(L"Fling started");
         InitializeAwsSdk();
         RegisterAppNotifications();
 
-#if defined _DEBUG && !defined DISABLE_XAML_GENERATED_BREAK_ON_UNHANDLED_EXCEPTION
-        UnhandledException([this](IInspectable const&, UnhandledExceptionEventArgs const& e)
+        UnhandledException([](IInspectable const&, UnhandledExceptionEventArgs const& e)
         {
+            ::Fling::Core::Log::Error(L"Unhandled exception: " + std::wstring(e.Message()));
+#if defined _DEBUG && !defined DISABLE_XAML_GENERATED_BREAK_ON_UNHANDLED_EXCEPTION
             if (IsDebuggerPresent())
             {
-                auto errorMessage = e.Message();
                 __debugbreak();
             }
-        });
 #endif
+        });
     }
 
     App::~App()
@@ -149,6 +151,14 @@ namespace winrt::Fling::implementation
 
     void App::ShowSendWindow(std::vector<std::filesystem::path> files)
     {
+        size_t folders = 0;
+        for (auto const& item : files)
+        {
+            std::error_code ec;
+            folders += std::filesystem::is_directory(item, ec) ? 1 : 0;
+        }
+        ::Fling::Core::Log::Info(L"Sharing " + std::to_wstring(files.size() - folders) + L" file(s) and "
+            + std::to_wstring(folders) + L" folder(s)");
         auto window = make<SendWindow>();
         s_sendWindows.push_back(window);
         window.Closed([](IInspectable const& sender, WindowEventArgs const&)
@@ -191,7 +201,7 @@ namespace winrt::Fling::implementation
         }
         catch (winrt::hresult_error const& e)
         {
-            OutputDebugStringW((L"Fling: AppNotificationManager::Register failed: " + e.message() + L"\n").c_str());
+            ::Fling::Core::Log::Warning(L"Notifications unavailable: " + std::wstring(e.message()));
         }
     }
 }

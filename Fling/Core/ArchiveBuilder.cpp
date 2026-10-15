@@ -195,6 +195,7 @@ namespace Fling::Core
             if (err != MZ_OK)
             {
                 result.errorMessage = L"Couldn't add " + entry.source.filename().wstring() + L" to the zip file.";
+                result.failedFile = entry.source;
                 break;
             }
             state.doneBefore += entry.size;

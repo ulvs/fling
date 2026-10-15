@@ -8,6 +8,7 @@
 #include "Controls/FlingToast.xaml.h"
 #include "Core/ClipboardHelper.h"
 #include "Core/ConfigManager.h"
+#include "Core/Log.h"
 #include "Core/S3Uploader.h"
 
 #include <cmath>
@@ -90,6 +91,7 @@ namespace winrt::Fling::implementation
         }
         else
         {
+            Log::Error(L"Couldn't save settings");
             ShowStatus(Status::Problem, L"Couldn't save the settings file.");
         }
     }
@@ -115,10 +117,12 @@ namespace winrt::Fling::implementation
         strongThis->TestButton().IsEnabled(true);
         if (result.success)
         {
+            Log::Info(L"Connection test succeeded");
             strongThis->ShowStatus(Status::Ok, hstring(L"Connected to " + config.bucket + L"."));
         }
         else
         {
+            Log::Warning(L"Connection test failed: " + result.errorMessage);
             strongThis->ShowStatus(Status::Problem, hstring(L"Couldn't connect. " + result.errorMessage));
         }
     }
@@ -146,6 +150,21 @@ namespace winrt::Fling::implementation
         {
             toast->Show(ToastTone::Alert, L"Couldn't copy the secret key");
         }
+    }
+
+    void SettingsPage::OpenLogFolder_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        std::error_code ec;
+        auto folder = Log::Folder();
+        std::filesystem::create_directories(folder, ec);
+        ShellExecuteW(nullptr, L"open", folder.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    }
+
+    void SettingsPage::CopyDiagnostics_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        bool copied = ClipboardHelper::CopyToClipboard(Log::DiagnosticInfo());
+        get_self<FlingToast>(Toast())->Show(copied ? ToastTone::Neutral : ToastTone::Alert,
+            copied ? L"Diagnostic info copied" : L"Couldn't copy the diagnostic info");
     }
 
     void SettingsPage::ShowStatus(Status status, hstring const& message)

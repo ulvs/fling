@@ -11,6 +11,7 @@
 #include "Core/ClipboardHelper.h"
 #include "Core/ConfigManager.h"
 #include "Core/Format.h"
+#include "Core/Log.h"
 #include "Core/ToastHelper.h"
 #include "Core/UploadCoordinator.h"
 #include "Pages/HistoryPage.xaml.h"
@@ -241,6 +242,9 @@ namespace winrt::Fling::implementation
 
             if (!built.success)
             {
+                ::Fling::Core::Log::Error(built.failedFile.empty()
+                    ? L"Zip failed: " + built.errorMessage
+                    : L"Zip failed: couldn't add " + ::Fling::Core::Log::DescribeType(built.failedFile));
                 --m_active;
                 m_jobs[index].succeeded = false;
                 m_jobs[index].error = built.errorMessage;
@@ -250,6 +254,8 @@ namespace winrt::Fling::implementation
             path = built.path;
             std::error_code ec;
             m_jobs[index].size = std::filesystem::file_size(path, ec);
+            ::Fling::Core::Log::Info(L"Zipped " + std::to_wstring(sources.size()) + L" item(s) into "
+                + ::Fling::Core::Log::Describe(path, m_jobs[index].size));
         }
 
         auto sizeText = ::Fling::Core::FormatSize(m_jobs[index].size);
@@ -352,6 +358,10 @@ namespace winrt::Fling::implementation
         size_t total = m_jobs.size();
         size_t failed = total - ok;
         bool copied = ok > 0 && ::Fling::Core::ClipboardHelper::CopyToClipboard(m_links);
+        if (ok > 0 && !copied)
+        {
+            ::Fling::Core::Log::Warning(L"Couldn't copy links to the clipboard");
+        }
 
         std::wstring summary;
         if (ok > 0)

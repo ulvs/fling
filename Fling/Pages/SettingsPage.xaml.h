@@ -18,6 +18,10 @@ namespace winrt::Fling::implementation
                                 winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e);
         void CopySecretButton_Click(winrt::Windows::Foundation::IInspectable const& sender,
                                     winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e);
+        void OpenLogFolder_Click(winrt::Windows::Foundation::IInspectable const& sender,
+                                 winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e);
+        void CopyDiagnostics_Click(winrt::Windows::Foundation::IInspectable const& sender,
+                                   winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e);
 
     private:
         enum class Status { Busy, Ok, Problem };
