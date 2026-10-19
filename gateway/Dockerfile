@@ -8,6 +8,8 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/fling-gateway ./cm
  && mkdir -p /out/data
 
 FROM gcr.io/distroless/static-debian12:nonroot
+LABEL org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://github.com/ulvs/fling"
 COPY --from=build /out/fling-gateway /usr/local/bin/fling-gateway
 COPY --from=build --chown=nonroot:nonroot /out/data /data
 ENV FLING_LISTEN=:8080 \
