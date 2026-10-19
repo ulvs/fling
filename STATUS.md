@@ -71,7 +71,7 @@ CI is `.github/workflows/gateway.yml`. It runs gofmt, vet and race tests. Pushes
 
 ## MSIX (packaged) dev loop
 
-Fling is a full MSIX app (`AppxPackage=true`, framework-dependent on `Microsoft.WindowsAppRuntime.2` ≥ 2.5.1). Identity `FlingApp.Fling`, publisher `CN=FlingApp`.
+Fling is a full MSIX app (`AppxPackage=true`, framework-dependent on `Microsoft.WindowsAppRuntime.2` ≥ 2.5.1). Identity `MocapMech.Fling-FileSender`, publisher `CN=4918F8D5-7A2B-423D-AE04-65B5A82A517B` (from Partner Center; Store name "Fling - File Sender", Start menu name "Fling"). Builds before 0.4.0.0 used `FlingApp.Fling` / `CN=FlingApp`, which is a different app to Windows: uninstall it, or both add a "Fling it" entry.
 
 ```
 # Build the layout (Release: the Debug layout needs the VCLibs *Debug* frameworks, which only VS F5 deploys)
@@ -83,13 +83,16 @@ Add-AppxPackage -Register E:\dev\fling\Fling\x64\Release\Fling\AppxManifest.xml 
 
 # Launch with identity / uninstall
 fling.exe            # app execution alias
-Get-AppxPackage FlingApp.Fling | Remove-AppxPackage
+Get-AppxPackage MocapMech.Fling-FileSender | Remove-AppxPackage
+
+# Store upload (unsigned; the Store signs it). Output: dist\store\Fling_<version>_x64.msixupload
+"...\MSBuild.exe" Fling/Fling.vcxproj -restore -p:Configuration=Release -p:Platform=x64 -p:GenerateAppxPackageOnBuild=true -p:UapAppxPackageBuildMode=StoreUpload -p:AppxBundle=Never -p:AppxPackageSigningEnabled=false "-p:AppxPackageDir=E:\dev\fling\dist\store\\"
 ```
 
 - **`FlingShellExt/`** — in-proc `IExplorerCommand` DLL (WRL, static CRT, no WinAppSDK) registered via `windows.fileExplorerContextMenus` + `com:SurrogateServer`. `Invoke` launches the `fling.exe` alias with the selected paths so Fling runs with package identity; the existing single-instance redirect handles the upload. Packaged into Fling's layout via a `<None DeploymentContent>` item; its OutDir is pinned so .sln and project builds agree.
 - **vcpkg DLLs** reach the package via `_FlingPackageVcpkgDlls`, which reads vcpkg's `$(IntDir)vcpkg.applocal.log`. vcpkg's own hand-off (`ReferenceCopyLocalPaths`) only happens when the linker runs, so a no-op rebuild used to produce an .msix without them.
 - **`_FlingDropPhantomWebView2Payload`** target: WebView2's winmd reference implies a non-existent `lib\Microsoft.Web.WebView2.Core.dll`, which collides with the real `native_uap` one (APPX1101).
-- **AppData is virtualized** for the packaged app: new writes to `%LOCALAPPDATA%\Fling` land under `%LOCALAPPDATA%\Packages\FlingApp.Fling_*\LocalCache`. The old SendTo shortcut feature was removed for this reason (the context menu replaces it).
+- **AppData is virtualized** for the packaged app: new writes to `%LOCALAPPDATA%\Fling` land under `%LOCALAPPDATA%\Packages\<package family>\LocalCache`. The old SendTo shortcut feature was removed for this reason (the context menu replaces it).
 
 ---
 
@@ -146,7 +149,8 @@ Tests in `Fling.Tests/` — gtest 1.17 from vcpkg (own `TestMain.cpp`, since `gt
 
 ### Next
 - Verify end to end with the packaged app: right-click a file → "Fling it" → URL on clipboard + toast + History entry. Check Settings shows the pre-MSIX config (AppData virtualization).
-- Release signing: self-signed `CN=FlingApp` is fine for local installs, but GitHub Releases users would have to trust the cert manually. Options: a real code-signing cert (e.g. Azure Trusted Signing) or Store-only distribution (the Store re-signs).
+- Microsoft Store: first submission in progress (0.4.0.0, x64). Guide and listing text: OneDrive `Fling Store submission.md`.
+- GitHub Releases signing: a sideload build must be signed by a cert whose subject equals the manifest Publisher (`CN=4918F8D5-…`); the old `CN=FlingApp` cert no longer fits. Options: a self-signed cert with that subject (users trust it manually), Azure Trusted Signing, or Store-only.
 
 ### Phase 4 polish
 - `MainWindow::SetupTrayIcon()` exists but is never called from the constructor; wire it up so the tray icon actually appears.

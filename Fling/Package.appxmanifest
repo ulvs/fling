@@ -12,13 +12,13 @@
   IgnorableNamespaces="uap uap5 desktop desktop4 desktop5 desktop9 com rescap">
 
   <Identity
-    Name="FlingApp.Fling"
-    Publisher="CN=FlingApp"
+    Name="MocapMech.Fling-FileSender"
+    Publisher="CN=4918F8D5-7A2B-423D-AE04-65B5A82A517B"
     Version="0.4.0.0" />
 
   <Properties>
-    <DisplayName>Fling</DisplayName>
-    <PublisherDisplayName>FlingApp</PublisherDisplayName>
+    <DisplayName>Fling - File Sender</DisplayName>
+    <PublisherDisplayName>MocapMech</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
