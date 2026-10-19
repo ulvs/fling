@@ -1,0 +1,2 @@
+# Go tooling (gofmt) and the Linux CI expect LF.
+* text=auto eol=lf

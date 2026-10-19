@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ulvs/fling/gateway/internal/api"
+	"github.com/ulvs/fling/gateway/internal/auth"
 	"github.com/ulvs/fling/gateway/internal/config"
 	"github.com/ulvs/fling/gateway/internal/policy"
 	"github.com/ulvs/fling/gateway/internal/storage"
@@ -68,9 +69,16 @@ func run(log *slog.Logger) error {
 		PublicURL: cfg.PublicURL,
 		Log:       log,
 		Now:       time.Now,
+		Providers: auth.Providers(cfg, nil),
+		Members:   cfg.Members,
+		OrgID:     defaultOrgID,
 		DevToken:  cfg.DevToken,
 		DevUser:   devUser,
 	}
+	for _, p := range server.Providers {
+		log.Info("sign-in provider", "provider", p.ID)
+	}
+	go cleanup(ctx, log, db)
 	httpServer := &http.Server{
 		Addr:              cfg.Listen,
 		Handler:           server.Handler(),
@@ -97,4 +105,20 @@ func run(log *slog.Logger) error {
 	shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return httpServer.Shutdown(shutdown)
+}
+
+// cleanup removes expired sessions and sign-ins in progress once an hour.
+func cleanup(ctx context.Context, log *slog.Logger, db *store.Store) {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			if err := db.DeleteExpired(ctx, now); err != nil {
+				log.Warn("cleanup", "err", err)
+			}
+		}
+	}
 }

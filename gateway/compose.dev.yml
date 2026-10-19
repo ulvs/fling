@@ -1,6 +1,8 @@
-# Local development: gateway + a local S3 server (Versity Gateway, which verifies SigV4 like real S3).
-# Not for production: fixed dev credentials, plain HTTP.
+# Local development: gateway + a local S3 server (Versity Gateway, which verifies SigV4 like real S3)
+# + a fake sign-in provider (mock-oauth2-server). Not for production: fixed dev credentials, plain HTTP.
 #   docker compose -f compose.dev.yml up --build
+# Browser: http://localhost:8080, "Continue with Dev sign-in". On the fake login form, enter any
+#   user name and these claims:  {"email": "ann@example.com", "email_verified": true}
 # API calls:  Authorization: Bearer dev-token-change-me-0123456789abcdef
 services:
   s3-init:
@@ -26,11 +28,22 @@ services:
     ports:
       - "9000:9000"
       - "8080:8080" # the gateway shares this network namespace
+      - "8090:8090" # and so does the sign-in server, so browser and gateway both reach it as localhost:8090
+
+  signin:
+    image: ghcr.io/navikt/mock-oauth2-server:latest
+    environment:
+      SERVER_PORT: "8090"
+      JSON_CONFIG: '{"interactiveLogin": true}'
+    network_mode: "service:s3"
+    depends_on:
+      - s3
 
   gateway:
     build: .
     depends_on:
       - s3
+      - signin
     environment:
       FLING_PUBLIC_URL: http://localhost:8080
       # Presigned URLs must be reachable from the client, so sign them for localhost:9000.
@@ -39,6 +52,11 @@ services:
       FLING_S3_ACCESS_KEY: devaccesskey
       FLING_S3_SECRET_KEY: devsecretkey0123456789
       FLING_DEV_TOKEN: dev-token-change-me-0123456789abcdef
+      FLING_OIDC_ISSUER: http://localhost:8090/default
+      FLING_OIDC_CLIENT_ID: fling-dev
+      FLING_OIDC_CLIENT_SECRET: fling-dev-secret
+      FLING_OIDC_NAME: Dev sign-in
+      FLING_MEMBER_EMAILS: ann@example.com
     volumes:
       - gateway-data:/data
     network_mode: "service:s3"

@@ -59,12 +59,12 @@ The root `docker-compose.yml` runs Versity Gateway (`versity/versitygw`) on port
 
 ## Gateway (`gateway/`, Go)
 
-The optional org-hosted layer: it holds the S3 key, issues presigned upload URLs and serves revocable `/l/{slug}` links. The plan is in OneDrive (`Fling Gateway plan.md`). Done: M0/M1, which cover config from `FLING_*` env vars, SQLite store, policy (size and TTL limits), uploads, links, revoke, and a dev bearer token. Next: M2, OIDC sign-in (Google + Microsoft) with a member list.
+The optional org-hosted layer: it holds the S3 key, issues presigned upload URLs and serves revocable `/l/{slug}` links. The plan is in OneDrive (`Fling Gateway plan.md`). Done: M0/M1, which cover config from `FLING_*` env vars, SQLite store, policy (size and TTL limits), uploads, links, revoke, and a dev bearer token. M2 adds OIDC sign-in (Microsoft, Google, generic OIDC) with a member list (`FLING_MEMBER_EMAILS`/`_DOMAINS`), browser sessions, and desktop sign-in (RFC 8252 loopback + PKCE, then `/api/v1/token` issues a 90-day sliding bearer token). Configuration, provider setup and the desktop protocol are in `gateway/README.md`. Next: M3, Gateway mode in Fling on Windows (sign in through the browser, upload through the gateway API).
 
 ```
 cd gateway
-go test -race ./...
-docker compose -f compose.dev.yml up --build   # gateway on :8080, local S3 on :9000
+go test ./...                                   # -race needs cgo; CI (Linux) runs it
+docker compose -f compose.dev.yml up --build   # gateway :8080, local S3 :9000, fake sign-in :8090
 # API: Authorization: Bearer dev-token-change-me-0123456789abcdef
 ```
 

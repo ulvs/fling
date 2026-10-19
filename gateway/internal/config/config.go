@@ -26,6 +26,24 @@ type Policy struct {
 	MaxUploadBytes int64
 }
 
+// OIDCProvider is one sign-in provider. Google and Microsoft have fixed issuers; Generic
+// covers any other OpenID Connect provider (Okta, Keycloak, a local mock).
+type OIDCProvider struct {
+	ClientID     string
+	ClientSecret string
+	Issuer       string // Generic only
+	Name         string // Generic only: the label on the sign-in button
+	Tenant       string // Microsoft only: "common" (default), "organizations", "consumers" or a tenant ID
+}
+
+func (p OIDCProvider) Enabled() bool { return p.ClientID != "" }
+
+// Members decides who may sign in: an exact email address or any address at a domain.
+type Members struct {
+	Emails  []string
+	Domains []string
+}
+
 type Config struct {
 	Listen       string
 	PublicURL    string // e.g. https://fling.intebitter.se, no trailing slash
@@ -33,9 +51,19 @@ type Config struct {
 	S3           S3
 	Policy       Policy
 
-	// DevToken enables a single static bearer token for development until sign-in exists.
+	Google    OIDCProvider
+	Microsoft OIDCProvider
+	Generic   OIDCProvider
+	Members   Members
+
+	// DevToken enables a single static bearer token for development.
 	DevToken     string
 	DevUserEmail string
+}
+
+// AnyProvider reports whether at least one sign-in provider is configured.
+func (c Config) AnyProvider() bool {
+	return c.Google.Enabled() || c.Microsoft.Enabled() || c.Generic.Enabled()
 }
 
 const minDevTokenLength = 32
@@ -81,6 +109,25 @@ func FromEnv(getenv func(string) string) (Config, error) {
 			DefaultTTL: duration("FLING_DEFAULT_LINK_TTL", "168h"),
 			MaxTTL:     duration("FLING_MAX_LINK_TTL", "720h"),
 		},
+		Google: OIDCProvider{
+			ClientID:     get("FLING_GOOGLE_CLIENT_ID", ""),
+			ClientSecret: get("FLING_GOOGLE_CLIENT_SECRET", ""),
+		},
+		Microsoft: OIDCProvider{
+			ClientID:     get("FLING_MICROSOFT_CLIENT_ID", ""),
+			ClientSecret: get("FLING_MICROSOFT_CLIENT_SECRET", ""),
+			Tenant:       get("FLING_MICROSOFT_TENANT", "common"),
+		},
+		Generic: OIDCProvider{
+			ClientID:     get("FLING_OIDC_CLIENT_ID", ""),
+			ClientSecret: get("FLING_OIDC_CLIENT_SECRET", ""),
+			Issuer:       strings.TrimRight(get("FLING_OIDC_ISSUER", ""), "/"),
+			Name:         get("FLING_OIDC_NAME", "single sign-on"),
+		},
+		Members: Members{
+			Emails:  list(get("FLING_MEMBER_EMAILS", "")),
+			Domains: list(get("FLING_MEMBER_DOMAINS", "")),
+		},
 		DevToken:     get("FLING_DEV_TOKEN", ""),
 		DevUserEmail: get("FLING_DEV_USER_EMAIL", "dev@localhost"),
 	}
@@ -112,7 +159,55 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	if cfg.DevToken != "" && len(cfg.DevToken) < minDevTokenLength {
 		errs = append(errs, fmt.Errorf("FLING_DEV_TOKEN must be at least %d characters", minDevTokenLength))
 	}
+	for prefix, p := range map[string]OIDCProvider{"FLING_GOOGLE": cfg.Google, "FLING_MICROSOFT": cfg.Microsoft, "FLING_OIDC": cfg.Generic} {
+		if p.Enabled() && p.ClientSecret == "" {
+			errs = append(errs, fmt.Errorf("%s_CLIENT_SECRET is required when %s_CLIENT_ID is set", prefix, prefix))
+		}
+	}
+	if cfg.Generic.Enabled() {
+		if u, err := url.Parse(cfg.Generic.Issuer); err != nil || u.Host == "" {
+			errs = append(errs, errors.New("FLING_OIDC_ISSUER must be an absolute URL when FLING_OIDC_CLIENT_ID is set"))
+		}
+	}
+	switch {
+	case !cfg.AnyProvider() && cfg.DevToken == "":
+		errs = append(errs, errors.New("configure a sign-in provider (FLING_GOOGLE_*, FLING_MICROSOFT_* or FLING_OIDC_*), or FLING_DEV_TOKEN for development"))
+	case cfg.AnyProvider() && len(cfg.Members.Emails) == 0 && len(cfg.Members.Domains) == 0:
+		errs = append(errs, errors.New("FLING_MEMBER_EMAILS or FLING_MEMBER_DOMAINS is required: nobody could sign in"))
+	}
 	return cfg, errors.Join(errs...)
+}
+
+// list splits a comma-separated value into lower-case, trimmed, non-empty items.
+func list(raw string) []string {
+	var out []string
+	for _, item := range strings.Split(raw, ",") {
+		if item = strings.ToLower(strings.TrimSpace(item)); item != "" {
+			out = append(out, strings.TrimPrefix(item, "@"))
+		}
+	}
+	return out
+}
+
+// Allows reports whether email may sign in. email must already be verified by the provider.
+func (m Members) Allows(email string) bool {
+	email = strings.ToLower(strings.TrimSpace(email))
+	at := strings.LastIndexByte(email, '@')
+	if at <= 0 || at == len(email)-1 {
+		return false
+	}
+	for _, e := range m.Emails {
+		if e == email {
+			return true
+		}
+	}
+	domain := email[at+1:]
+	for _, d := range m.Domains {
+		if d == domain {
+			return true
+		}
+	}
+	return false
 }
 
 func isLocalHost(host string) bool {

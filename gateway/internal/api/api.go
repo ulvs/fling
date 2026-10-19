@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/ulvs/fling/gateway/internal/auth"
 	"github.com/ulvs/fling/gateway/internal/policy"
 	"github.com/ulvs/fling/gateway/internal/storage"
 	"github.com/ulvs/fling/gateway/internal/store"
@@ -37,17 +37,38 @@ type Server struct {
 	Log       *slog.Logger
 	Now       func() time.Time
 
-	// DevToken and DevUser authenticate API calls until sign-in exists.
+	// Sign-in: the configured providers, who may sign in, and the organisation new members join.
+	Providers []*auth.Provider
+	Members   Members
+	OrgID     string
+
+	// DevToken and DevUser authenticate API calls without signing in, for development.
 	DevToken string
 	DevUser  store.User
 }
 
+// Members decides who may sign in, by verified email address.
+type Members interface{ Allows(email string) bool }
+
 type ctxKey struct{}
+
+// tokenKey carries the hash of the desktop token that authenticated a request.
+type tokenKey struct{}
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
 	mux.HandleFunc("GET /readyz", s.ready)
+	mux.HandleFunc("GET /{$}", s.home)
+	mux.HandleFunc("GET /auth/login/{provider}", s.login)
+	mux.HandleFunc("GET /auth/callback/{provider}", s.callback)
+	mux.HandleFunc("POST /auth/logout", s.logout)
+	mux.HandleFunc("GET /auth/desktop", s.desktopStart)
+	mux.HandleFunc("GET /auth/desktop/{flow}", s.desktopConfirm)
+	mux.HandleFunc("POST /auth/desktop/{flow}", s.desktopApprove)
+	mux.HandleFunc("POST /api/v1/token", s.token)
+	mux.Handle("GET /api/v1/me", s.auth(s.me))
+	mux.Handle("DELETE /api/v1/session", s.auth(s.signOut))
 	mux.Handle("POST /api/v1/uploads", s.auth(s.createUpload))
 	mux.Handle("POST /api/v1/uploads/{id}/complete", s.auth(s.completeUpload))
 	mux.Handle("GET /api/v1/links", s.auth(s.listLinks))
@@ -93,16 +114,41 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 	})
 }
 
+// auth accepts a desktop token from the token endpoint, or the development token.
 func (s *Server) auth(next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if !ok || s.DevToken == "" || subtle.ConstantTimeCompare([]byte(token), []byte(s.DevToken)) != 1 {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="fling"`)
-			writeError(w, http.StatusUnauthorized, "unauthorized", "Sign in to Fling Gateway first.")
+		if !ok || token == "" {
+			s.unauthorized(w)
 			return
 		}
-		next(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, s.DevUser)))
+		if s.DevToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(s.DevToken)) == 1 {
+			next(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, s.DevUser)))
+			return
+		}
+		now := s.Now()
+		hash := store.HashToken(token)
+		se, err := s.Store.SessionByHash(r.Context(), hash, now)
+		if errors.Is(err, store.ErrNotFound) || (err == nil && (se.Kind != "desktop" || !s.Members.Allows(se.User.Email))) {
+			s.unauthorized(w)
+			return
+		} else if err != nil {
+			s.internalError(w, "session lookup", err)
+			return
+		}
+		if now.Sub(se.LastSeen) >= touchInterval {
+			if err := s.Store.TouchSession(r.Context(), hash, now.Add(desktopSessionTTL), now); err != nil {
+				s.Log.Warn("touch session", "err", err)
+			}
+		}
+		ctx := context.WithValue(context.WithValue(r.Context(), ctxKey{}, se.User), tokenKey{}, hash)
+		next(w, r.WithContext(ctx))
 	})
+}
+
+func (s *Server) unauthorized(w http.ResponseWriter) {
+	w.Header().Set("WWW-Authenticate", `Bearer realm="fling"`)
+	writeError(w, http.StatusUnauthorized, "unauthorized", "Sign in to Fling Gateway first.")
 }
 
 func userFrom(r *http.Request) store.User { return r.Context().Value(ctxKey{}).(store.User) }
@@ -364,24 +410,6 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit(r.Context(), store.User{}, l.OrgID, "link.download", l.ID, "")
 	http.Redirect(w, r, url, http.StatusFound)
-}
-
-var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{.Title}} · Fling</title>
-<style>
-:root{color-scheme:light dark;--surface:#FAF8F5;--ink:#1E1C1A;--muted:#6B655E;--line:#E6E1DA}
-@media (prefers-color-scheme:dark){:root{--surface:#171615;--ink:#F2EEE8;--muted:#A8A198;--line:#34312D}}
-body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--surface);color:var(--ink);
-font:14px/20px "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif}
-main{max-width:420px;padding:24px;border:1px solid var(--line);border-radius:10px}
-h1{font-size:17px;line-height:24px;margin:0 0 4px}p{margin:0;color:var(--muted)}
-</style></head><body><main><h1>{{.Title}}</h1><p>{{.Message}}</p></main></body></html>`))
-
-func (s *Server) page(w http.ResponseWriter, status int, title, message string) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(status)
-	pageTemplate.Execute(w, struct{ Title, Message string }{title, message})
 }
 
 // cleanName keeps only the base name, without control characters or path separators.
