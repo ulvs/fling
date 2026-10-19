@@ -14,7 +14,7 @@
   <Identity
     Name="FlingApp.Fling"
     Publisher="CN=FlingApp"
-    Version="0.3.3.0" />
+    Version="0.4.0.0" />
 
   <Properties>
     <DisplayName>Fling</DisplayName>
