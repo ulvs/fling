@@ -39,8 +39,11 @@ Verified live against MinIO at `https://s3.intebitter.se` / bucket `fling` / use
 # Build from repo root
 "C:\Program Files\Microsoft Visual Studio\18\Professional\MSBuild\Current\Bin\MSBuild.exe" Fling/Fling.vcxproj -restore -p:Configuration=Debug -p:Platform=x64
 
-# Launch (output layout is per-project now)
-Fling\x64\Debug\Fling\Fling.exe
+# Fling.exe can't start unpackaged (no Windows App SDK bootstrap): register the layout and
+# launch it with identity, see "MSIX (packaged) dev loop" below.
+# FLING_DATA_DIR=<folder> makes config.json/history.json come from that folder instead
+# (demo data for Store screenshots, experiments). Launch via the package's own alias
+# %LOCALAPPDATA%\Microsoft\WindowsApps\<package family>\fling.exe so the variable is inherited.
 
 # Tests (46 unit tests; the 9 S3 integration tests skip unless `docker compose up -d` is running)
 "...\MSBuild.exe" Fling.Tests/Fling.Tests.vcxproj -p:Configuration=Debug -p:Platform=x64
