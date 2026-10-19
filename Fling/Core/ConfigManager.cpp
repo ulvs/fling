@@ -17,6 +17,13 @@ namespace Fling::Core
 
     std::filesystem::path ConfigManager::GetDefaultConfigPath()
     {
+        // FLING_DATA_DIR points Fling at another data folder (tests, demo screenshots).
+        wchar_t dataDir[MAX_PATH]{};
+        if (GetEnvironmentVariableW(L"FLING_DATA_DIR", dataDir, MAX_PATH) > 0)
+        {
+            return std::filesystem::path(dataDir) / L"config.json";
+        }
+
         wchar_t* localAppData = nullptr;
         if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppData)))
         {
