@@ -142,7 +142,7 @@ namespace Fling::Core
             credentials,
             clientConfig,
             Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
-            /*useVirtualAddressing=*/ !m_config.usePathStyle);
+            /*useVirtualAddressing=*/ !m_config.UsesPathStyle());
     }
 
     S3Uploader::~S3Uploader() = default;

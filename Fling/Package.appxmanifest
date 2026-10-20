@@ -14,7 +14,7 @@
   <Identity
     Name="MocapMech.Fling-FileSender"
     Publisher="CN=4918F8D5-7A2B-423D-AE04-65B5A82A517B"
-    Version="0.4.0.0" />
+    Version="0.4.1.0" />
 
   <Properties>
     <DisplayName>Fling - File Sender</DisplayName>

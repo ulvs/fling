@@ -191,7 +191,7 @@ namespace Fling::Core
         os << L"Storage: " << (config.IsConfigured() ? L"configured" : L"not configured")
            << L", " << EndpointKind(config.endpoint)
            << L", region " << (config.region.empty() ? L"empty" : L"set")
-           << L", path-style " << (config.usePathStyle ? L"on" : L"off")
+           << L", path-style " << (config.UsesPathStyle() ? L"on" : L"off")
            << L", links expire after " << config.expirySeconds / 86400 << L" days\r\n";
         os << L"Several items: " << (config.zipMultiple ? L"one zip" : L"separate links") << L"\r\n";
         os << L"\r\nLast log lines:\r\n";

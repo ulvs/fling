@@ -25,6 +25,32 @@ namespace Fling::Models
                    !secretKey.empty();
         }
 
+        // Path-style addressing (https://host/bucket/key) works on every S3-compatible service,
+        // while virtual-host style (https://bucket.host/key) needs DNS and TLS for each bucket,
+        // which self-hosted servers such as MinIO rarely have. So only Amazon S3 honours the
+        // setting; everything else always uses path-style, and a missed checkbox can't break it.
+        bool UsesPathStyle() const
+        {
+            return usePathStyle || !IsAmazonEndpoint();
+        }
+
+        bool IsAmazonEndpoint() const
+        {
+            std::wstring host = endpoint;
+            if (auto scheme = host.find(L"://"); scheme != std::wstring::npos)
+            {
+                host = host.substr(scheme + 3);
+            }
+            host = host.substr(0, host.find_first_of(L":/"));
+            for (auto& c : host)
+            {
+                c = static_cast<wchar_t>(towlower(c));
+            }
+            constexpr std::wstring_view aws = L"amazonaws.com";
+            return host.empty() || host == aws ||
+                (host.size() > aws.size() && host.ends_with(aws) && host[host.size() - aws.size() - 1] == L'.');
+        }
+
         // JSON serialization
         static FlingConfig FromJson(nlohmann::json const& j);
         nlohmann::json ToJson() const;

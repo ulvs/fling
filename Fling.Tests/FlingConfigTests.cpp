@@ -138,3 +138,23 @@ TEST_F(FlingConfigTests, EmptyStringConversion)
     EXPECT_TRUE(WideToUtf8(L"").empty());
     EXPECT_TRUE(Utf8ToWide("").empty());
 }
+
+TEST_F(FlingConfigTests, UsesPathStyle_EverywhereButAmazon)
+{
+    FlingConfig config;
+    for (auto endpoint : { L"https://s3.intebitter.se", L"http://localhost:9000", L"https://s3.eu-central-003.backblazeb2.com",
+                           L"https://abc123.r2.cloudflarestorage.com", L"HTTPS://S3.WASABISYS.COM", L"https://amazonaws.com.evil.example",
+                           L"https://notamazonaws.com" })
+    {
+        config.endpoint = endpoint;
+        EXPECT_TRUE(config.UsesPathStyle()) << endpoint;
+    }
+    for (auto endpoint : { L"https://s3.amazonaws.com", L"https://s3.eu-north-1.amazonaws.com", L"S3.AMAZONAWS.COM:443", L"" })
+    {
+        config.endpoint = endpoint;
+        config.usePathStyle = false;
+        EXPECT_FALSE(config.UsesPathStyle()) << endpoint;
+        config.usePathStyle = true;
+        EXPECT_TRUE(config.UsesPathStyle()) << endpoint;
+    }
+}

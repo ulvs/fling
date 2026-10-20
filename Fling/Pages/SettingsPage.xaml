@@ -52,7 +52,7 @@
                                    SpinButtonPlacementMode="Inline" HorizontalAlignment="Left" MinWidth="160"/>
 
                         <CheckBox x:Name="PathStyleCheckBox"
-                                  Content="Use path-style addressing (MinIO, Backblaze B2, Cloudflare R2)"/>
+                                  Content="Use path-style addressing on Amazon S3 (other services always use it)"/>
                     </StackPanel>
                 </Border>
 
