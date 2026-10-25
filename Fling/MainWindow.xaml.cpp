@@ -15,6 +15,7 @@
 using namespace winrt;
 using namespace winrt::Microsoft::UI::Xaml;
 using namespace winrt::Microsoft::UI::Xaml::Controls;
+using namespace winrt::Microsoft::UI::Windowing;
 
 #define WM_TRAYICON (WM_USER + 1)
 #define IDM_OPEN 1001
@@ -42,9 +43,36 @@ namespace winrt::Fling::implementation
         ExtendsContentIntoTitleBar(true);
         SetTitleBar(AppTitleBar());
         AppWindow().TitleBar().PreferredTheme(winrt::Microsoft::UI::Windowing::TitleBarTheme::UseDefaultAppMode);
+        PlaceAtDefaultSize();
 
         // Until storage is set up there's nothing to upload to, so start on Settings.
         SelectPage(::Fling::Core::ConfigManager().IsConfigured() ? L"uploads" : L"settings");
+    }
+
+    // Without a size, Windows makes a new window most of a large screen. Open at a comfortable
+    // size instead (the content is at most 640 wide), centred on the screen with the cursor.
+    void MainWindow::PlaceAtDefaultSize()
+    {
+        constexpr int kWidthDip = 920;
+        constexpr int kHeightDip = 700;
+        constexpr int kMinWidthDip = 480;
+        constexpr int kMinHeightDip = 400;
+
+        auto appWindow = AppWindow();
+        double scale = GetDpiForWindow(m_hwnd) / 96.0;
+        POINT cursor{};
+        GetCursorPos(&cursor);
+        auto area = DisplayArea::GetFromPoint({ cursor.x, cursor.y }, DisplayAreaFallback::Primary).WorkArea();
+
+        int width = std::min(static_cast<int>(kWidthDip * scale), area.Width * 9 / 10);
+        int height = std::min(static_cast<int>(kHeightDip * scale), area.Height * 9 / 10);
+        appWindow.MoveAndResize({ area.X + (area.Width - width) / 2, area.Y + (area.Height - height) / 2, width, height });
+
+        if (auto presenter = appWindow.Presenter().try_as<OverlappedPresenter>())
+        {
+            presenter.PreferredMinimumWidth(static_cast<int>(kMinWidthDip * scale));
+            presenter.PreferredMinimumHeight(static_cast<int>(kMinHeightDip * scale));
+        }
     }
 
     MainWindow::~MainWindow()

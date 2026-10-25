@@ -32,6 +32,7 @@ namespace winrt::Fling::implementation
         static LRESULT CALLBACK TrayWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
         void HandleTrayMessage(WPARAM wParam, LPARAM lParam);
         void ShowTrayContextMenu();
+        void PlaceAtDefaultSize();
     };
 }
 
