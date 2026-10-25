@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "S3Uploader.h"
+#include "ContentType.h"
 
 #include <aws/core/auth/AWSCredentials.h>
 #include <aws/core/client/ClientConfiguration.h>
@@ -32,47 +33,6 @@ namespace
     std::wstring FromAws(Aws::String const& a)
     {
         return Utf8ToWide(std::string(a.c_str(), a.size()));
-    }
-
-    Aws::String ContentTypeFor(std::filesystem::path const& path)
-    {
-        auto ext = path.extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-
-        static const std::unordered_map<std::string, Aws::String> kMap = {
-            { ".txt",  "text/plain" },
-            { ".json", "application/json" },
-            { ".xml",  "application/xml" },
-            { ".html", "text/html" },
-            { ".htm",  "text/html" },
-            { ".css",  "text/css" },
-            { ".js",   "application/javascript" },
-            { ".pdf",  "application/pdf" },
-            { ".zip",  "application/zip" },
-            { ".7z",   "application/x-7z-compressed" },
-            { ".tar",  "application/x-tar" },
-            { ".gz",   "application/gzip" },
-            { ".png",  "image/png" },
-            { ".jpg",  "image/jpeg" },
-            { ".jpeg", "image/jpeg" },
-            { ".gif",  "image/gif" },
-            { ".webp", "image/webp" },
-            { ".svg",  "image/svg+xml" },
-            { ".mp3",  "audio/mpeg" },
-            { ".mp4",  "video/mp4" },
-            { ".mov",  "video/quicktime" },
-            { ".webm", "video/webm" },
-            { ".doc",  "application/msword" },
-            { ".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
-            { ".xls",  "application/vnd.ms-excel" },
-            { ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
-            { ".ppt",  "application/vnd.ms-powerpoint" },
-            { ".pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
-        };
-
-        auto it = kMap.find(ext);
-        return it != kMap.end() ? it->second : Aws::String("application/octet-stream");
     }
 
     Aws::String JoinKey(std::wstring const& prefix, std::wstring const& uuid, std::wstring const& fileName)
@@ -209,7 +169,7 @@ namespace Fling::Core
         Aws::S3::Model::PutObjectRequest request;
         request.SetBucket(ToAws(m_config.bucket));
         request.SetKey(ToAws(s3Key));
-        request.SetContentType(ContentTypeFor(filePath));
+        request.SetContentType(Aws::String(ContentTypeFor(filePath)));
         request.SetBody(stream);
 
         if (progressCallback)
@@ -281,7 +241,7 @@ namespace Fling::Core
             filePath.string().c_str(),
             ToAws(m_config.bucket),
             ToAws(s3Key),
-            ContentTypeFor(filePath),
+            Aws::String(ContentTypeFor(filePath)),
             Aws::Map<Aws::String, Aws::String>{});
 
         while (handle->GetStatus() != Aws::Transfer::TransferStatus::COMPLETED &&
@@ -320,7 +280,7 @@ namespace Fling::Core
 
     UploadResult S3Uploader::TestConnection()
     {
-        if (!m_config.IsConfigured())
+        if (!m_config.IsS3Configured())
         {
             return UploadResult::Failure(L"Configuration incomplete");
         }

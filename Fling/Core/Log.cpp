@@ -2,6 +2,7 @@
 #include "Log.h"
 
 #include "ConfigManager.h"
+#include "GatewayClient.h"
 #include "Format.h"
 #include "../Models/FlingConfig.h"
 
@@ -188,7 +189,14 @@ namespace Fling::Core
         std::wostringstream os;
         os << L"Fling " << AppVersion() << L" (x64)\r\n";
         os << L"Windows " << WindowsVersion() << L"\r\n";
-        os << L"Storage: " << (config.IsConfigured() ? L"configured" : L"not configured")
+        if (config.UsesGateway())
+        {
+            auto scheme = config.gatewayUrl.find(L"://");
+            auto host = config.gatewayUrl.substr(scheme == std::wstring::npos ? 0 : scheme + 3);
+            os << L"Storage: Fling Gateway " << (host.empty() ? L"(no address)" : host)
+               << L", " << (GatewayCredentials::Load(config.gatewayUrl) ? L"signed in" : L"not signed in") << L"\r\n";
+        }
+        os << L"Own storage: " << (config.IsS3Configured() ? L"configured" : L"not configured")
            << L", " << EndpointKind(config.endpoint)
            << L", region " << (config.region.empty() ? L"empty" : L"set")
            << L", path-style " << (config.UsesPathStyle() ? L"on" : L"off")

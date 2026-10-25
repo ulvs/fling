@@ -8,6 +8,8 @@
 #include "Controls/FlingToast.xaml.h"
 #include "Core/ClipboardHelper.h"
 #include "Core/ConfigManager.h"
+#include "Core/GatewayClient.h"
+#include "Core/GatewaySignIn.h"
 #include "Core/Log.h"
 #include "Core/S3Uploader.h"
 
@@ -49,6 +51,117 @@ namespace winrt::Fling::implementation
         ExpiryNumberBox().Value(std::clamp(std::round(config.expirySeconds / double(kSecondsPerDay)), 1.0, 7.0));
         PathStyleCheckBox().IsChecked(config.usePathStyle);
         MultipleChoice().SelectedIndex(config.zipMultiple ? 0 : 1);
+        GatewayUrlTextBox().Text(hstring(config.gatewayUrl));
+        StorageChoice().SelectedIndex(config.UsesGateway() ? 1 : 0);
+        UpdateStorageCards();
+        RefreshGatewayAccount();
+    }
+
+    bool SettingsPage::UsesGatewayChoice()
+    {
+        return StorageChoice().SelectedIndex() == 1;
+    }
+
+    void SettingsPage::UpdateStorageCards()
+    {
+        bool gateway = UsesGatewayChoice();
+        GatewayCard().Visibility(gateway ? Visibility::Visible : Visibility::Collapsed);
+        StorageCard().Visibility(gateway ? Visibility::Collapsed : Visibility::Visible);
+    }
+
+    // Shows who's signed in to the gateway in the address box (tokens are kept per address).
+    void SettingsPage::RefreshGatewayAccount()
+    {
+        if (m_signingIn)
+        {
+            return;
+        }
+        auto url = GatewayClient::NormalizeUrl(std::wstring(GatewayUrlTextBox().Text()));
+        auto stored = url.empty() ? std::nullopt : GatewayCredentials::Load(url);
+        GatewayAccountText().Text(stored ? hstring(L"Signed in as " + stored->email + L".") : hstring(L"Not signed in."));
+        GatewaySignInButton().Content(box_value(stored ? L"Sign in again" : L"Sign in"));
+        GatewaySignOutButton().Visibility(stored ? Visibility::Visible : Visibility::Collapsed);
+    }
+
+    void SettingsPage::StorageChoice_SelectionChanged(IInspectable const&, SelectionChangedEventArgs const&)
+    {
+        UpdateStorageCards();
+    }
+
+    void SettingsPage::GatewayUrlTextBox_TextChanged(IInspectable const&, TextChangedEventArgs const&)
+    {
+        RefreshGatewayAccount();
+    }
+
+    fire_and_forget SettingsPage::GatewaySignIn_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        auto strongThis = get_strong();
+        auto url = GatewayClient::NormalizeUrl(std::wstring(GatewayUrlTextBox().Text()));
+        if (url.empty())
+        {
+            ShowStatus(Status::Problem, L"Enter the gateway's address, like https://fling.example.com.");
+            co_return;
+        }
+        GatewayUrlTextBox().Text(hstring(url));
+
+        // Save the choice now, so shares use the gateway as soon as sign-in finishes.
+        ConfigManager cm;
+        auto config = cm.Load();
+        config.storage = L"gateway";
+        config.gatewayUrl = url;
+        cm.Save(config);
+
+        m_signingIn = true;
+        m_cancelSignIn = false;
+        GatewaySignInButton().IsEnabled(false);
+        GatewayCancelButton().Visibility(Visibility::Visible);
+        GatewaySignOutButton().Visibility(Visibility::Collapsed);
+        GatewayAccountText().Text(L"Finish signing in in your browser\u2026");
+        StatusPanel().Visibility(Visibility::Collapsed);
+
+        apartment_context uiThread;
+        co_await resume_background();
+        auto result = GatewaySignIn::SignIn(url, strongThis->m_cancelSignIn);
+        if (result.success)
+        {
+            GatewayCredentials::Save(url, result.email, result.token);
+        }
+        co_await uiThread;
+
+        strongThis->m_signingIn = false;
+        strongThis->GatewaySignInButton().IsEnabled(true);
+        strongThis->GatewayCancelButton().Visibility(Visibility::Collapsed);
+        strongThis->RefreshGatewayAccount();
+        auto toast = get_self<FlingToast>(strongThis->Toast());
+        if (result.success)
+        {
+            toast->Show(ToastTone::Neutral, L"Signed in as " + result.email);
+        }
+        else if (!strongThis->m_cancelSignIn)
+        {
+            strongThis->ShowStatus(Status::Problem, hstring(L"Couldn't sign in. " + result.errorMessage));
+        }
+    }
+
+    void SettingsPage::GatewayCancel_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        m_cancelSignIn = true;
+    }
+
+    fire_and_forget SettingsPage::GatewaySignOut_Click(IInspectable const&, RoutedEventArgs const&)
+    {
+        auto strongThis = get_strong();
+        auto url = GatewayClient::NormalizeUrl(std::wstring(GatewayUrlTextBox().Text()));
+        auto stored = url.empty() ? std::nullopt : GatewayCredentials::Load(url);
+        GatewayCredentials::Remove(url);
+        RefreshGatewayAccount();
+        get_self<FlingToast>(Toast())->Show(ToastTone::Neutral, L"Signed out");
+        if (stored)
+        {
+            // Tell the gateway too, so the token stops working everywhere. Best effort.
+            co_await resume_background();
+            GatewayClient(url, stored->token).SignOut();
+        }
     }
 
     FlingConfig SettingsPage::ReadForm()
@@ -70,17 +183,25 @@ namespace winrt::Fling::implementation
         auto checked = PathStyleCheckBox().IsChecked();
         config.usePathStyle = checked && checked.Value();
         config.zipMultiple = MultipleChoice().SelectedIndex() != 1;
+        config.storage = UsesGatewayChoice() ? L"gateway" : L"s3";
+        config.gatewayUrl = GatewayClient::NormalizeUrl(std::wstring(GatewayUrlTextBox().Text()));
         return config;
     }
 
     void SettingsPage::SaveButton_Click(IInspectable const&, RoutedEventArgs const&)
     {
         auto config = ReadForm();
-        if (!config.IsConfigured())
+        if (config.UsesGateway() && config.gatewayUrl.empty())
+        {
+            ShowStatus(Status::Problem, L"Enter the gateway's address, like https://fling.example.com.");
+            return;
+        }
+        if (!config.UsesGateway() && !config.IsS3Configured())
         {
             ShowStatus(Status::Problem, L"Fill in the endpoint, bucket, access key and secret key.");
             return;
         }
+        GatewayUrlTextBox().Text(hstring(config.gatewayUrl));
 
         ConfigManager cm;
         // keyPrefix isn't in the form; keep what's on disk.
@@ -100,7 +221,41 @@ namespace winrt::Fling::implementation
     {
         auto strongThis = get_strong();
         auto config = ReadForm();
-        if (!config.IsConfigured())
+        if (config.UsesGateway())
+        {
+            auto stored = config.gatewayUrl.empty() ? std::nullopt : GatewayCredentials::Load(config.gatewayUrl);
+            if (!stored)
+            {
+                ShowStatus(Status::Problem, L"Sign in to the gateway first.");
+                co_return;
+            }
+            TestButton().IsEnabled(false);
+            ShowStatus(Status::Busy, L"Testing the connection\u2026");
+            apartment_context ui;
+            co_await resume_background();
+            auto me = GatewayClient(config.gatewayUrl, stored->token).Me();
+            if (me.signInNeeded)
+            {
+                GatewayCredentials::Remove(config.gatewayUrl);
+            }
+            co_await ui;
+            strongThis->TestButton().IsEnabled(true);
+            strongThis->RefreshGatewayAccount();
+            if (me.success)
+            {
+                Log::Info(L"Gateway connection test succeeded");
+                strongThis->ShowStatus(Status::Ok, hstring(L"Connected to the gateway as " + me.email + L"."));
+            }
+            else
+            {
+                Log::Warning(L"Gateway connection test failed: " + me.errorMessage);
+                strongThis->ShowStatus(Status::Problem, hstring(me.signInNeeded
+                    ? std::wstring(L"Your sign-in has ended. Sign in again.")
+                    : L"Couldn't connect. " + me.errorMessage));
+            }
+            co_return;
+        }
+        if (!config.IsS3Configured())
         {
             ShowStatus(Status::Problem, L"Fill in the endpoint, bucket, access key and secret key first.");
             co_return;

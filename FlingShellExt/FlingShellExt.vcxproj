@@ -12,6 +12,8 @@
   </ItemGroup>
 
   <PropertyGroup Label="Globals">
+    <!-- The 64-bit compiler: the 32-bit one runs out of address space on the ~1 GB precompiled header. -->
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
     <ProjectGuid>{C0841E4F-C65D-470E-A9A8-8F2A43837CEB}</ProjectGuid>
     <RootNamespace>FlingShellExt</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>

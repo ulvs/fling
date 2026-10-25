@@ -3,6 +3,7 @@
 
 #include "ClipboardHelper.h"
 #include "ConfigManager.h"
+#include "GatewayClient.h"
 #include "HistoryManager.h"
 #include "Log.h"
 
@@ -27,14 +28,15 @@ namespace Fling::Core
         }
 
         ConfigManager cm;
-        if (!cm.IsConfigured())
+        auto config = cm.Load();
+        if (!config.IsConfigured())
         {
-            out.errorMessage = L"Fling is not configured. Open Settings to add your S3 credentials.";
+            out.errorMessage = config.UsesGateway()
+                ? L"Fling isn't set up yet. Open Settings and enter your gateway's address."
+                : L"Fling isn't set up yet. Open Settings to add your storage.";
             Log::Warning(L"Upload skipped: storage not configured");
             return out;
         }
-
-        auto config = cm.Load();
 
         std::error_code ec;
         uint64_t fileSize = std::filesystem::file_size(filePath, ec);
@@ -43,10 +45,34 @@ namespace Fling::Core
             fileSize = 0;
         }
 
-        Log::Info(L"Uploading " + Log::Describe(filePath, fileSize));
+        Log::Info(L"Uploading " + Log::Describe(filePath, fileSize) + (config.UsesGateway() ? L" through the gateway" : L""));
         auto started = std::chrono::steady_clock::now();
-        S3Uploader uploader(config);
-        auto result = uploader.Upload(filePath, std::move(progress));
+        UploadResult result;
+        int64_t expirySeconds = config.expirySeconds;
+        if (config.UsesGateway())
+        {
+            auto credentials = GatewayCredentials::Load(config.gatewayUrl);
+            if (!credentials)
+            {
+                result = UploadResult::Failure(L"Sign in to your gateway first: open Settings and choose Sign in.");
+            }
+            else
+            {
+                auto g = GatewayClient(config.gatewayUrl, credentials->token).Upload(filePath, config.expirySeconds, progress);
+                if (g.signInNeeded)
+                {
+                    // The gateway refused the token (expired, signed out, or no longer a member).
+                    GatewayCredentials::Remove(config.gatewayUrl);
+                }
+                result = g.success ? UploadResult::Success(g.url, g.uploadId) : UploadResult::Failure(g.errorMessage);
+                expirySeconds = g.expiresInSeconds;
+            }
+        }
+        else
+        {
+            S3Uploader uploader(config);
+            result = uploader.Upload(filePath, std::move(progress));
+        }
         auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
         if (result.success)
         {
@@ -69,7 +95,7 @@ namespace Fling::Core
                 result.s3Key,
                 result.presignedUrl,
                 fileSize,
-                config.expirySeconds);
+                static_cast<int>(expirySeconds));
             out.success = true;
             out.url = result.presignedUrl;
         }

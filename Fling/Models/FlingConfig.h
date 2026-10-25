@@ -15,14 +15,23 @@ namespace Fling::Models
         bool usePathStyle{ false };     // Use path-style addressing (required for MinIO)
         std::wstring keyPrefix;         // Optional prefix prepended to every S3 key
         bool zipMultiple{ true };       // Several files shared at once go into one zip (folders are always zipped)
+        std::wstring storage{ L"s3" };  // where files go: "s3" (own storage) or "gateway" (a Fling Gateway)
+        std::wstring gatewayUrl;        // e.g. https://fling.example.com; the sign-in token is in Credential Manager
 
-        // Check if configuration is complete enough to attempt uploads
-        bool IsConfigured() const
+        bool UsesGateway() const { return storage == L"gateway"; }
+
+        bool IsS3Configured() const
         {
             return !endpoint.empty() &&
                    !bucket.empty() &&
                    !accessKey.empty() &&
                    !secretKey.empty();
+        }
+
+        // Complete enough to attempt uploads (for a gateway, signing in is checked separately).
+        bool IsConfigured() const
+        {
+            return UsesGateway() ? !gatewayUrl.empty() : IsS3Configured();
         }
 
         // Path-style addressing (https://host/bucket/key) works on every S3-compatible service,
@@ -109,6 +118,12 @@ namespace Fling::Models
         if (j.contains("zipMultipleFiles") && j["zipMultipleFiles"].is_boolean())
             config.zipMultiple = j["zipMultipleFiles"].get<bool>();
 
+        if (j.contains("storage") && j["storage"].is_string() && j["storage"].get<std::string>() == "gateway")
+            config.storage = L"gateway";
+
+        if (j.contains("gatewayUrl") && j["gatewayUrl"].is_string())
+            config.gatewayUrl = Utf8ToWide(j["gatewayUrl"].get<std::string>());
+
         return config;
     }
 
@@ -123,7 +138,9 @@ namespace Fling::Models
             {"expirySeconds", expirySeconds},
             {"usePathStyle", usePathStyle},
             {"keyPrefix", WideToUtf8(keyPrefix)},
-            {"zipMultipleFiles", zipMultiple}
+            {"zipMultipleFiles", zipMultiple},
+            {"storage", WideToUtf8(storage)},
+            {"gatewayUrl", WideToUtf8(gatewayUrl)}
         };
     }
 

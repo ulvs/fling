@@ -158,3 +158,22 @@ TEST_F(FlingConfigTests, UsesPathStyle_EverywhereButAmazon)
         EXPECT_TRUE(config.UsesPathStyle()) << endpoint;
     }
 }
+
+TEST_F(FlingConfigTests, GatewaySettingsRoundTrip)
+{
+    FlingConfig config;
+    EXPECT_FALSE(config.UsesGateway());  // own storage by default, also for old config files
+
+    config.storage = L"gateway";
+    config.gatewayUrl = L"https://fling.example.com";
+    EXPECT_TRUE(config.UsesGateway());
+    EXPECT_TRUE(config.IsConfigured());   // a gateway needs only its address here
+    EXPECT_FALSE(config.IsS3Configured());
+
+    FlingConfig restored = FlingConfig::FromJson(config.ToJson());
+    EXPECT_TRUE(restored.UsesGateway());
+    EXPECT_EQ(restored.gatewayUrl, L"https://fling.example.com");
+
+    nlohmann::json odd = {{"storage", "something-else"}};
+    EXPECT_FALSE(FlingConfig::FromJson(odd).UsesGateway());
+}

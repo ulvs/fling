@@ -19,6 +19,45 @@
                 <Border Style="{StaticResource FlingCardStyle}">
                     <StackPanel Spacing="{StaticResource FlingSpace4}">
                         <StackPanel Spacing="{StaticResource FlingSpace1}">
+                            <TextBlock Text="Where files go" Style="{StaticResource FlingLabelTextStyle}"/>
+                            <TextBlock Style="{StaticResource FlingCaptionTextStyle}"
+                                       Text="Use your own storage, or your organisation's Fling Gateway if it has one."/>
+                        </StackPanel>
+                        <RadioButtons x:Name="StorageChoice" SelectionChanged="StorageChoice_SelectionChanged">
+                            <RadioButton Content="My own storage (S3-compatible)"/>
+                            <RadioButton Content="My organisation's Fling Gateway"/>
+                        </RadioButtons>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="GatewayCard" Style="{StaticResource FlingCardStyle}" Visibility="Collapsed">
+                    <StackPanel Spacing="{StaticResource FlingSpace4}">
+                        <StackPanel Spacing="{StaticResource FlingSpace1}">
+                            <TextBlock Text="Fling Gateway" Style="{StaticResource FlingLabelTextStyle}"/>
+                            <TextBlock Style="{StaticResource FlingCaptionTextStyle}"
+                                       Text="You sign in once in your browser. The gateway keeps the storage keys and decides how long links last."/>
+                        </StackPanel>
+                        <TextBox x:Name="GatewayUrlTextBox" Header="Gateway address"
+                                 PlaceholderText="https://fling.example.com" InputScope="Url"
+                                 TextChanged="GatewayUrlTextBox_TextChanged"/>
+                        <StackPanel Spacing="{StaticResource FlingSpace2}">
+                            <TextBlock x:Name="GatewayAccountText" Style="{StaticResource FlingBodyTextStyle}"
+                                       TextWrapping="Wrap" Text="Not signed in."/>
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource FlingSpace2}">
+                                <Button x:Name="GatewaySignInButton" Content="Sign in"
+                                        Style="{StaticResource FlingSecondaryButtonStyle}" Click="GatewaySignIn_Click"/>
+                                <Button x:Name="GatewayCancelButton" Content="Cancel" Visibility="Collapsed"
+                                        Style="{StaticResource FlingQuietButtonStyle}" Click="GatewayCancel_Click"/>
+                                <Button x:Name="GatewaySignOutButton" Content="Sign out" Visibility="Collapsed"
+                                        Style="{StaticResource FlingQuietButtonStyle}" Click="GatewaySignOut_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="StorageCard" Style="{StaticResource FlingCardStyle}">
+                    <StackPanel Spacing="{StaticResource FlingSpace4}">
+                        <StackPanel Spacing="{StaticResource FlingSpace1}">
                             <TextBlock Text="Storage" Style="{StaticResource FlingLabelTextStyle}"/>
                             <TextBlock Style="{StaticResource FlingCaptionTextStyle}"
                                        Text="Fling uploads to S3-compatible storage you own: MinIO, Backblaze B2, Cloudflare R2 or Amazon S3."/>
