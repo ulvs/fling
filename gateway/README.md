@@ -28,6 +28,48 @@ docker compose -f compose.dev.yml exec gateway fling-gateway user invite bo@exam
 
 The stack contains the gateway, a local S3 server (Versity Gateway) and a fake sign-in server (mock-oauth2-server). Tests: `go test ./...`. CI also runs `-race`, `go vet` and `gofmt`.
 
+## Run it in production
+
+The image is `ghcr.io/ulvs/fling-gateway`, for amd64 and arm64. It runs as a non-root user and keeps everything in `/data`. Put it behind HTTPS (Caddy, Traefik, nginx or a cloud load balancer) and set `FLING_TRUSTED_PROXIES` to the proxy's address.
+
+```yaml
+services:
+  fling-gateway:
+    image: ghcr.io/ulvs/fling-gateway:latest   # pin sha-<commit> or a digest in production
+    restart: unless-stopped
+    env_file: fling-gateway.env                 # the settings below; chmod 600, keep out of git
+    volumes:
+      - fling-gateway-data:/data
+    ports:
+      - "127.0.0.1:8080:8080"                   # only reachable through the reverse proxy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+volumes:
+  fling-gateway-data:
+```
+
+A minimal `fling-gateway.env` with local accounts:
+
+```
+FLING_PUBLIC_URL=https://fling.example.com
+FLING_S3_ENDPOINT=https://s3.example.com
+FLING_S3_BUCKET=fling-gateway
+FLING_S3_ACCESS_KEY=...
+FLING_S3_SECRET_KEY=...
+FLING_LOCAL_ACCOUNTS=true
+FLING_TRUSTED_PROXIES=172.16.0.0/12
+```
+
+Then invite the first person:
+
+```
+docker compose exec fling-gateway fling-gateway user invite you@example.com
+```
+
+**Back up `/data/fling-gateway.db`.** It holds the accounts, passkeys and links; Litestream works well. Keep the backup in a different bucket from the uploads if that bucket has an expiry rule. `GET /readyz` returns `ready` when the database and storage can be reached; use it for monitoring.
+
 ## Configuration
 
 Everything is set through environment variables.
