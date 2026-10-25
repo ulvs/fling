@@ -4,9 +4,9 @@ An optional server an organisation hosts between Fling and its S3-compatible sto
 
 - Files go straight from the computer to the storage, through presigned URLs. They never pass through the gateway.
 - A share link (`/l/…`) redirects to a five-minute presigned download, so turning a link off takes effect immediately.
-- Members sign in with Microsoft, Google, or any other OpenID Connect provider. Fling on Windows signs in through the browser and receives its own token.
+- Members sign in with Microsoft, Google, or any other OpenID Connect provider. They can also have **local accounts**, invited by an admin, using passkeys or passwords with optional two-step codes. Fling on Windows signs in through the browser and receives its own token.
 
-Status: sign-in (M2) works. Per-group rules, the admin pages and large-file uploads come later.
+Status: sign-in (M2) and local accounts with passkeys (M2b) work. Per-group rules, the admin pages and large-file uploads come later.
 
 ## Run it locally
 
@@ -18,6 +18,12 @@ Open http://localhost:8080 and choose **Continue with Dev sign-in**. On the fake
 
 ```
 {"email": "ann@example.com", "email_verified": true}
+```
+
+Local accounts are on in the dev stack too. Make an invite link with:
+
+```
+docker compose -f compose.dev.yml exec gateway fling-gateway user invite bo@example.com
 ```
 
 The stack contains the gateway, a local S3 server (Versity Gateway) and a fake sign-in server (mock-oauth2-server). Tests: `go test ./...`. CI also runs `-race`, `go vet` and `gofmt`.
@@ -43,9 +49,13 @@ Everything is set through environment variables.
 | `FLING_GOOGLE_CLIENT_ID`, `FLING_GOOGLE_CLIENT_SECRET` | | Sign in with Google. |
 | `FLING_OIDC_ISSUER`, `FLING_OIDC_CLIENT_ID`, `FLING_OIDC_CLIENT_SECRET` | | Any other OpenID Connect provider (Okta, Keycloak, Authentik, …). |
 | `FLING_OIDC_NAME` | `single sign-on` | Button label for that provider. |
+| `FLING_LOCAL_ACCOUNTS` | `false` | Local accounts: invited by an admin, signing in with a passkey or a password. |
+| `FLING_REQUIRE_TWO_FACTOR` | `false` | Password sign-ins must also give a code from an authenticator app. Passkeys already count as two factors. |
+| `FLING_RESEND_API_KEY`, `FLING_MAIL_FROM` | | Send invites and password resets through [Resend](https://resend.com), e.g. `FLING_MAIL_FROM="Fling <fling@example.com>"` on a domain verified in Resend. This also turns on "Forgot your password?". Without it, the admin passes links on by hand. |
+| `FLING_TRUSTED_PROXIES` | | Comma-separated IPs or CIDR ranges of your reverse proxy (e.g. Caddy). Its `X-Forwarded-For` is then trusted for per-IP sign-in throttling. |
 | `FLING_DEV_TOKEN` | | Development only: a bearer token (32+ characters) that acts as `FLING_DEV_USER_EMAIL` without signing in. Leave it unset in production. |
 
-At least one sign-in provider (or the development token) is required. With a provider configured, at least one member email or domain is required. Removing someone from the member list and restarting the gateway ends their access, including tokens already issued.
+At least one way to sign in is required: local accounts, a provider, or the development token. With a provider configured, at least one member email or domain is required. Removing someone from the member list and restarting the gateway ends their access, including tokens already issued.
 
 ## Sign-in providers
 
@@ -70,6 +80,30 @@ Each provider redirects back to `<FLING_PUBLIC_URL>/auth/callback/<provider>`, w
 4. Put the client ID and secret in `FLING_GOOGLE_CLIENT_ID` and `FLING_GOOGLE_CLIENT_SECRET`.
 
 Google accounts sign in only when Google reports the email as verified.
+
+## Local accounts
+
+Set `FLING_LOCAL_ACCOUNTS=true`. There's no open sign-up: an admin invites people.
+
+```
+docker exec <container> fling-gateway user invite ann@example.com   # 7-day invite link, emailed if Resend is set up
+docker exec <container> fling-gateway user reset ann@example.com    # 24-hour link for a new password or passkey
+docker exec <container> fling-gateway user disable ann@example.com  # turn off and sign out everywhere
+docker exec <container> fling-gateway user enable ann@example.com
+docker exec <container> fling-gateway user remove-codes ann@example.com  # lost phone and recovery codes
+docker exec <container> fling-gateway user list
+```
+
+The invite link lets the person create a **passkey** (Windows Hello, Touch ID, a phone, a security key) or choose a **password**. On their account page they can add more passkeys, change the password, and turn on **two-step codes**: any authenticator app, with ten one-time recovery codes.
+
+How it's protected:
+- Passwords are hashed with Argon2id (64 MiB, RFC 9106). At least 12 characters, no other forced rules (NIST SP 800-63B).
+- Five wrong passwords for an account, or 30 failures from one IP address, block further tries for 15 minutes. An unknown email takes as long to reject as a wrong password.
+- A two-step code works once. A half-finished sign-in ends after five wrong codes.
+- Passkeys require user verification (fingerprint, face or PIN), only work on this gateway's address, and are rejected if the authenticator looks cloned.
+- Changing a password signs out every other session, including Fling on Windows. Using a reset link signs out all of them.
+- Invite, reset and "forgot password" links work once. Using one cancels the account's other open links.
+- An invited account may also use Google or Microsoft sign-in, as long as the provider has verified the same email address.
 
 ## How Fling on Windows signs in
 

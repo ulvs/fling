@@ -83,8 +83,8 @@ func TestMaxTTLMustCoverDefault(t *testing.T) {
 func TestSomethingMustSignIn(t *testing.T) {
 	v := valid()
 	delete(v, "FLING_GOOGLE_CLIENT_ID")
-	if _, err := FromEnv(env(v)); err == nil || !strings.Contains(err.Error(), "sign-in provider") {
-		t.Fatalf("want provider error, got %v", err)
+	if _, err := FromEnv(env(v)); err == nil || !strings.Contains(err.Error(), "way to sign in") {
+		t.Fatalf("want sign-in error, got %v", err)
 	}
 	v["FLING_DEV_TOKEN"] = strings.Repeat("x", 32)
 	if _, err := FromEnv(env(v)); err != nil {
@@ -133,5 +133,47 @@ func TestMembersAllows(t *testing.T) {
 		if got := cfg.Members.Allows(email); got != want {
 			t.Errorf("Allows(%q) = %v, want %v", email, got, want)
 		}
+	}
+}
+
+func TestLocalAccountsAlone(t *testing.T) {
+	v := valid()
+	delete(v, "FLING_GOOGLE_CLIENT_ID")
+	delete(v, "FLING_MEMBER_EMAILS")
+	v["FLING_LOCAL_ACCOUNTS"] = "true"
+	cfg, err := FromEnv(env(v))
+	if err != nil {
+		t.Fatalf("local accounts need no provider or member list: %v", err)
+	}
+	if !cfg.LocalAccounts || cfg.RequireTwoFactor {
+		t.Fatalf("unexpected %+v", cfg)
+	}
+}
+
+func TestMailNeedsFrom(t *testing.T) {
+	v := valid()
+	v["FLING_RESEND_API_KEY"] = "re_test"
+	if _, err := FromEnv(env(v)); err == nil || !strings.Contains(err.Error(), "FLING_MAIL_FROM") {
+		t.Fatalf("want FLING_MAIL_FROM error, got %v", err)
+	}
+	v["FLING_MAIL_FROM"] = "Fling <fling@example.com>"
+	if cfg, err := FromEnv(env(v)); err != nil || !cfg.Mail.Enabled() {
+		t.Fatalf("mail config: %v", err)
+	}
+}
+
+func TestTrustedProxies(t *testing.T) {
+	v := valid()
+	v["FLING_TRUSTED_PROXIES"] = "10.0.0.0/8, 192.168.1.106, ::1"
+	cfg, err := FromEnv(env(v))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.TrustedProxies) != 3 || cfg.TrustedProxies[1].String() != "192.168.1.106/32" {
+		t.Fatalf("got %v", cfg.TrustedProxies)
+	}
+	v["FLING_TRUSTED_PROXIES"] = "not-an-ip"
+	if _, err := FromEnv(env(v)); err == nil {
+		t.Fatal("want error for a bad proxy")
 	}
 }

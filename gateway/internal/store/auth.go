@@ -140,10 +140,10 @@ func (s *Store) SessionByHash(ctx context.Context, tokenHash string, now time.Ti
 	var se Session
 	var expires, seen int64
 	err := s.db.QueryRowContext(ctx,
-		`SELECT u.id, u.org_id, u.email, s.kind, s.expires_at, s.last_seen_at
+		`SELECT u.id, u.org_id, u.email, u.local, u.disabled_at IS NOT NULL, s.kind, s.expires_at, s.last_seen_at
 		 FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?`,
 		tokenHash, now.Unix()).
-		Scan(&se.User.ID, &se.User.OrgID, &se.User.Email, &se.Kind, &expires, &seen)
+		Scan(&se.User.ID, &se.User.OrgID, &se.User.Email, &se.User.Local, &se.User.Disabled, &se.Kind, &expires, &seen)
 	if errors.Is(err, sql.ErrNoRows) {
 		return se, ErrNotFound
 	}
@@ -176,6 +176,8 @@ func (s *Store) DeleteExpired(ctx context.Context, now time.Time) error {
 		`DELETE FROM sessions WHERE expires_at <= ?`,
 		`DELETE FROM login_states WHERE expires_at <= ?`,
 		`DELETE FROM desktop_flows WHERE expires_at <= ?`,
+		`DELETE FROM account_links WHERE expires_at <= ?`,
+		`DELETE FROM auth_steps WHERE expires_at <= ?`,
 	} {
 		if _, err := s.db.ExecContext(ctx, q, now.Unix()); err != nil {
 			return err
@@ -186,7 +188,8 @@ func (s *Store) DeleteExpired(ctx context.Context, now time.Time) error {
 
 func (s *Store) UserByID(ctx context.Context, id string) (User, error) {
 	u := User{ID: id}
-	err := s.db.QueryRowContext(ctx, `SELECT org_id, email FROM users WHERE id = ?`, id).Scan(&u.OrgID, &u.Email)
+	err := s.db.QueryRowContext(ctx, `SELECT org_id, email, local, disabled_at IS NOT NULL FROM users WHERE id = ?`, id).
+		Scan(&u.OrgID, &u.Email, &u.Local, &u.Disabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, ErrNotFound
 	}

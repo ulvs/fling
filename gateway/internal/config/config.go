@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -56,10 +57,29 @@ type Config struct {
 	Generic   OIDCProvider
 	Members   Members
 
+	// LocalAccounts enables accounts the gateway manages itself: invited by an admin,
+	// signing in with a passkey or a password (optionally with a two-step code).
+	LocalAccounts bool
+	// RequireTwoFactor makes password sign-ins also need a code from an authenticator app.
+	RequireTwoFactor bool
+	// TrustedProxies are reverse proxies whose X-Forwarded-For is believed (for throttling).
+	TrustedProxies []netip.Prefix
+
+	Mail Mail
+
 	// DevToken enables a single static bearer token for development.
 	DevToken     string
 	DevUserEmail string
 }
+
+// Mail sends invites and password-reset links through the Resend API. Without an API key the
+// admin passes links on by hand.
+type Mail struct {
+	ResendAPIKey string
+	From         string // e.g. "Fling <fling@example.com>", on a domain verified in Resend
+}
+
+func (m Mail) Enabled() bool { return m.ResendAPIKey != "" }
 
 // AnyProvider reports whether at least one sign-in provider is configured.
 func (c Config) AnyProvider() bool {
@@ -128,8 +148,26 @@ func FromEnv(getenv func(string) string) (Config, error) {
 			Emails:  list(get("FLING_MEMBER_EMAILS", "")),
 			Domains: list(get("FLING_MEMBER_DOMAINS", "")),
 		},
+		LocalAccounts:    boolean("FLING_LOCAL_ACCOUNTS", false),
+		RequireTwoFactor: boolean("FLING_REQUIRE_TWO_FACTOR", false),
+		Mail: Mail{
+			ResendAPIKey: get("FLING_RESEND_API_KEY", ""),
+			From:         get("FLING_MAIL_FROM", ""),
+		},
 		DevToken:     get("FLING_DEV_TOKEN", ""),
 		DevUserEmail: get("FLING_DEV_USER_EMAIL", "dev@localhost"),
+	}
+	for _, raw := range list(get("FLING_TRUSTED_PROXIES", "")) {
+		prefix, err := netip.ParsePrefix(raw)
+		if err != nil {
+			addr, addrErr := netip.ParseAddr(raw)
+			if addrErr != nil {
+				errs = append(errs, fmt.Errorf("FLING_TRUSTED_PROXIES: %q is not an IP address or CIDR range", raw))
+				continue
+			}
+			prefix = netip.PrefixFrom(addr, addr.BitLen())
+		}
+		cfg.TrustedProxies = append(cfg.TrustedProxies, prefix.Masked())
 	}
 
 	maxBytes, err := strconv.ParseInt(get("FLING_MAX_UPLOAD_BYTES", "2147483648"), 10, 64)
@@ -169,9 +207,12 @@ func FromEnv(getenv func(string) string) (Config, error) {
 			errs = append(errs, errors.New("FLING_OIDC_ISSUER must be an absolute URL when FLING_OIDC_CLIENT_ID is set"))
 		}
 	}
+	if cfg.Mail.Enabled() && cfg.Mail.From == "" {
+		errs = append(errs, errors.New("FLING_MAIL_FROM is required when FLING_RESEND_API_KEY is set, e.g. Fling <fling@example.com>"))
+	}
 	switch {
-	case !cfg.AnyProvider() && cfg.DevToken == "":
-		errs = append(errs, errors.New("configure a sign-in provider (FLING_GOOGLE_*, FLING_MICROSOFT_* or FLING_OIDC_*), or FLING_DEV_TOKEN for development"))
+	case !cfg.AnyProvider() && !cfg.LocalAccounts && cfg.DevToken == "":
+		errs = append(errs, errors.New("configure a way to sign in: FLING_LOCAL_ACCOUNTS=true, a provider (FLING_GOOGLE_*, FLING_MICROSOFT_* or FLING_OIDC_*), or FLING_DEV_TOKEN for development"))
 	case cfg.AnyProvider() && len(cfg.Members.Emails) == 0 && len(cfg.Members.Domains) == 0:
 		errs = append(errs, errors.New("FLING_MEMBER_EMAILS or FLING_MEMBER_DOMAINS is required: nobody could sign in"))
 	}

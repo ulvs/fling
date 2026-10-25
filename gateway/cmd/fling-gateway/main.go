@@ -5,8 +5,10 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,6 +17,7 @@ import (
 	"github.com/ulvs/fling/gateway/internal/api"
 	"github.com/ulvs/fling/gateway/internal/auth"
 	"github.com/ulvs/fling/gateway/internal/config"
+	"github.com/ulvs/fling/gateway/internal/mail"
 	"github.com/ulvs/fling/gateway/internal/policy"
 	"github.com/ulvs/fling/gateway/internal/storage"
 	"github.com/ulvs/fling/gateway/internal/store"
@@ -23,6 +26,9 @@ import (
 const defaultOrgID = "default"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "user" {
+		os.Exit(userCommand(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if err := run(log); err != nil {
 		log.Error("fling-gateway stopped", "err", err)
@@ -45,38 +51,18 @@ func run(log *slog.Logger) error {
 	}
 	defer db.Close()
 
-	now := time.Now()
-	if err := db.EnsureOrg(ctx, defaultOrgID, "Default", now); err != nil {
-		return err
-	}
-	var devUser store.User
-	if cfg.DevToken != "" {
-		log.Warn("FLING_DEV_TOKEN is set: API calls with it act as the development user", "user", cfg.DevUserEmail)
-		if devUser, err = db.EnsureUser(ctx, defaultOrgID, cfg.DevUserEmail, now); err != nil {
-			return err
-		}
-	}
-
-	objects, err := storage.NewS3(ctx, cfg.S3)
+	server, err := newServer(ctx, cfg, log, db)
 	if err != nil {
 		return err
 	}
-
-	server := &api.Server{
-		Store:     db,
-		Objects:   objects,
-		Policy:    policy.Policy(cfg.Policy),
-		PublicURL: cfg.PublicURL,
-		Log:       log,
-		Now:       time.Now,
-		Providers: auth.Providers(cfg, nil),
-		Members:   cfg.Members,
-		OrgID:     defaultOrgID,
-		DevToken:  cfg.DevToken,
-		DevUser:   devUser,
+	if cfg.DevToken != "" {
+		log.Warn("FLING_DEV_TOKEN is set: API calls with it act as the development user", "user", cfg.DevUserEmail)
 	}
 	for _, p := range server.Providers {
 		log.Info("sign-in provider", "provider", p.ID)
+	}
+	if server.Local {
+		log.Info("local accounts on", "passkeys", true, "two_factor_required", cfg.RequireTwoFactor, "mail", cfg.Mail.Enabled())
 	}
 	go cleanup(ctx, log, db)
 	httpServer := &http.Server{
@@ -121,4 +107,49 @@ func cleanup(ctx context.Context, log *slog.Logger, db *store.Store) {
 			}
 		}
 	}
+}
+
+// newServer builds the gateway from its configuration; the user command uses it too.
+func newServer(ctx context.Context, cfg config.Config, log *slog.Logger, db *store.Store) (*api.Server, error) {
+	now := time.Now()
+	if err := db.EnsureOrg(ctx, defaultOrgID, "Default", now); err != nil {
+		return nil, err
+	}
+	var devUser store.User
+	if cfg.DevToken != "" {
+		var err error
+		if devUser, err = db.EnsureUser(ctx, defaultOrgID, cfg.DevUserEmail, now); err != nil {
+			return nil, err
+		}
+	}
+	objects, err := storage.NewS3(ctx, cfg.S3)
+	if err != nil {
+		return nil, err
+	}
+	server := &api.Server{
+		Store:            db,
+		Objects:          objects,
+		Policy:           policy.Policy(cfg.Policy),
+		PublicURL:        cfg.PublicURL,
+		Log:              log,
+		Now:              time.Now,
+		Providers:        auth.Providers(cfg, nil),
+		Members:          cfg.Members,
+		OrgID:            defaultOrgID,
+		Local:            cfg.LocalAccounts,
+		RequireTwoFactor: cfg.RequireTwoFactor,
+		TrustedProxies:   cfg.TrustedProxies,
+		DevToken:         cfg.DevToken,
+		DevUser:          devUser,
+	}
+	if cfg.LocalAccounts {
+		u, _ := url.Parse(cfg.PublicURL)
+		if server.WebAuthn, err = api.NewWebAuthn(cfg.PublicURL, u.Hostname()); err != nil {
+			return nil, fmt.Errorf("passkeys: %w", err)
+		}
+	}
+	if cfg.Mail.Enabled() {
+		server.Mail = mail.NewResend(cfg.Mail.ResendAPIKey, cfg.Mail.From)
+	}
+	return server, nil
 }

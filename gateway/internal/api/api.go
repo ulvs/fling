@@ -10,13 +10,17 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"net/netip"
 	"path"
 	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/go-webauthn/webauthn/webauthn"
+
 	"github.com/ulvs/fling/gateway/internal/auth"
+	"github.com/ulvs/fling/gateway/internal/mail"
 	"github.com/ulvs/fling/gateway/internal/policy"
 	"github.com/ulvs/fling/gateway/internal/storage"
 	"github.com/ulvs/fling/gateway/internal/store"
@@ -42,6 +46,17 @@ type Server struct {
 	Members   Members
 	OrgID     string
 
+	// Local accounts: invited users with passkeys, or passwords plus optional two-step codes.
+	Local            bool
+	RequireTwoFactor bool
+	WebAuthn         *webauthn.WebAuthn // set when Local is on
+	Mail             mail.Sender        // nil: links are handed out by the admin
+	TrustedProxies   []netip.Prefix
+
+	// Failed sign-in attempts, per email address and per client IP address.
+	byEmail *auth.Throttle
+	byIP    *auth.Throttle
+
 	// DevToken and DevUser authenticate API calls without signing in, for development.
 	DevToken string
 	DevUser  store.User
@@ -56,6 +71,10 @@ type ctxKey struct{}
 type tokenKey struct{}
 
 func (s *Server) Handler() http.Handler {
+	if s.byEmail == nil {
+		s.byEmail = auth.NewThrottle(5, 15*time.Minute)
+		s.byIP = auth.NewThrottle(30, 15*time.Minute)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
 	mux.HandleFunc("GET /readyz", s.ready)
@@ -66,6 +85,24 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /auth/desktop", s.desktopStart)
 	mux.HandleFunc("GET /auth/desktop/{flow}", s.desktopConfirm)
 	mux.HandleFunc("POST /auth/desktop/{flow}", s.desktopApprove)
+	mux.HandleFunc("POST /auth/password", s.passwordSignIn)
+	mux.HandleFunc("GET /auth/code", s.codePage)
+	mux.HandleFunc("POST /auth/code", s.codeSubmit)
+	mux.HandleFunc("GET /auth/code/setup", s.codeSetupPage)
+	mux.HandleFunc("POST /auth/code/setup", s.codeSetupSubmit)
+	mux.HandleFunc("GET /auth/link/{token}", s.linkPage)
+	mux.HandleFunc("POST /auth/link/{token}", s.linkSubmit)
+	mux.HandleFunc("GET /auth/forgot", s.forgotPage)
+	mux.HandleFunc("POST /auth/forgot", s.forgotSubmit)
+	mux.HandleFunc("POST /auth/passkey/register/begin", s.passkeyRegisterBegin)
+	mux.HandleFunc("POST /auth/passkey/register/finish", s.passkeyRegisterFinish)
+	mux.HandleFunc("POST /auth/passkey/login/begin", s.passkeyLoginBegin)
+	mux.HandleFunc("POST /auth/passkey/login/finish", s.passkeyLoginFinish)
+	mux.HandleFunc("GET /account", s.accountPage)
+	mux.HandleFunc("POST /account/password", s.changePassword)
+	mux.HandleFunc("POST /account/code/off", s.turnOffCodes)
+	mux.HandleFunc("POST /account/passkeys/{id}/remove", s.removePasskey)
+	mux.HandleFunc("GET /static/fling.js", s.script)
 	mux.HandleFunc("POST /api/v1/token", s.token)
 	mux.Handle("GET /api/v1/me", s.auth(s.me))
 	mux.Handle("DELETE /api/v1/session", s.auth(s.signOut))
@@ -85,7 +122,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("X-Frame-Options", "DENY")
-		h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
+		h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; connect-src 'self'")
 		h.Set("Cache-Control", "no-store")
 		next.ServeHTTP(w, r)
 	})
@@ -129,7 +166,7 @@ func (s *Server) auth(next http.HandlerFunc) http.Handler {
 		now := s.Now()
 		hash := store.HashToken(token)
 		se, err := s.Store.SessionByHash(r.Context(), hash, now)
-		if errors.Is(err, store.ErrNotFound) || (err == nil && (se.Kind != "desktop" || !s.Members.Allows(se.User.Email))) {
+		if errors.Is(err, store.ErrNotFound) || (err == nil && (se.Kind != "desktop" || !s.allowed(se.User))) {
 			s.unauthorized(w)
 			return
 		} else if err != nil {
@@ -144,6 +181,40 @@ func (s *Server) auth(next http.HandlerFunc) http.Handler {
 		ctx := context.WithValue(context.WithValue(r.Context(), ctxKey{}, se.User), tokenKey{}, hash)
 		next(w, r.WithContext(ctx))
 	})
+}
+
+// clientIP is the caller's address. Behind trusted proxies it's the last X-Forwarded-For hop
+// that isn't a trusted proxy itself; anything a client writes further left is ignored.
+func (s *Server) clientIP(r *http.Request) string {
+	ap, err := netip.ParseAddrPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	ip := ap.Addr().Unmap()
+	if !s.trustedProxy(ip) {
+		return ip.String()
+	}
+	hops := strings.Split(r.Header.Get("X-Forwarded-For"), ",")
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop, err := netip.ParseAddr(strings.TrimSpace(hops[i]))
+		if err != nil {
+			break
+		}
+		ip = hop.Unmap()
+		if !s.trustedProxy(ip) {
+			break
+		}
+	}
+	return ip.String()
+}
+
+func (s *Server) trustedProxy(ip netip.Addr) bool {
+	for _, p := range s.TrustedProxies {
+		if p.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) unauthorized(w http.ResponseWriter) {

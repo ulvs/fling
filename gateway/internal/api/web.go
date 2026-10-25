@@ -62,7 +62,7 @@ func (s *Server) browserUser(r *http.Request) (store.User, string, bool) {
 	}
 	hash := store.HashToken(c.Value)
 	se, err := s.Store.SessionByHash(r.Context(), hash, s.Now())
-	if err != nil || se.Kind != "browser" || !s.Members.Allows(se.User.Email) {
+	if err != nil || se.Kind != "browser" || !s.allowed(se.User) {
 		return store.User{}, "", false
 	}
 	return se.User, hash, true
@@ -88,6 +88,18 @@ type pageData struct {
 	Links     []linkResponse
 	FormURL   string
 	Now       time.Time
+
+	// Local accounts
+	Local    bool   // show the passkey button and the email/password form
+	Mail     bool   // "Forgot your password?" works
+	Flow     string // a desktop sign-in waiting for this one
+	Problem  string // what went wrong, shown above the form
+	Notice   string // a confirmation, e.g. "Password changed."
+	QR       template.HTML
+	Secret   string
+	Codes    []string
+	Account  *accountView
+	LinkCode string // invite/reset token, for the passkey button on the link page
 }
 
 func (s *Server) render(w http.ResponseWriter, status int, name string, d pageData) {
@@ -114,10 +126,14 @@ func (s *Server) providerButtons(desktopFlow string) []providerButton {
 	return out
 }
 
+func (s *Server) signinPage(title, flow string) pageData {
+	return pageData{Title: title, Providers: s.providerButtons(flow), Local: s.Local, Mail: s.Local && s.Mail != nil, Flow: flow}
+}
+
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	user, _, ok := s.browserUser(r)
 	if !ok {
-		s.render(w, http.StatusOK, "signin", pageData{Title: "Sign in", Providers: s.providerButtons("")})
+		s.render(w, http.StatusOK, "signin", s.signinPage("Sign in", ""))
 		return
 	}
 	links, err := s.Store.ListLinks(r.Context(), user.OrgID, user.ID)
@@ -212,7 +228,13 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 		s.page(w, http.StatusBadGateway, "Sign-in didn't work", "Try again in a moment.")
 		return
 	}
-	if !s.Members.Allows(id.Email) {
+	existing, err := s.Store.AccountByEmail(r.Context(), s.OrgID, id.Email)
+	if err == nil && existing.Disabled {
+		s.page(w, http.StatusForbidden, "This account is turned off", "Ask your administrator if you think this is a mistake.")
+		return
+	}
+	invited := err == nil && existing.Local && s.Local
+	if !invited && !s.memberEmail(id.Email) {
 		s.Log.Info("sign-in refused: not a member", "provider", p.ID)
 		s.audit(r.Context(), store.User{}, s.OrgID, "signin.refused", "", "provider="+p.ID)
 		s.page(w, http.StatusForbidden, "You're not a member yet", id.Email+" isn't on this gateway's member list. Ask your administrator to add you.")
@@ -220,24 +242,50 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := s.Store.EnsureUser(r.Context(), s.OrgID, id.Email, now)
 	if err == nil {
-		err = s.Store.RecordLogin(r.Context(), user.ID, now)
-	}
-	token := store.NewToken()
-	if err == nil {
-		err = s.Store.CreateSession(r.Context(), store.HashToken(token), user, "browser", now.Add(browserSessionTTL), now)
+		err = s.startBrowserSession(w, r, user, p.ID)
 	}
 	if err != nil {
 		s.Log.Error("create session", "err", err)
 		s.page(w, http.StatusInternalServerError, "Something went wrong", "Try again in a moment.")
 		return
 	}
-	s.audit(r.Context(), user, user.OrgID, "signin", user.ID, "provider="+p.ID)
-	s.setCookie(w, "fling_session", token, browserSessionTTL)
 	target := ls.ReturnTo
 	if ls.DesktopFlow != "" {
-		target = "/auth/desktop/" + url.PathEscape(ls.DesktopFlow)
+		target = signedInTarget(ls.DesktopFlow)
 	}
 	http.Redirect(w, r, target, http.StatusSeeOther)
+}
+
+// allowed decides who may use the gateway: accounts that aren't turned off, and are either
+// invited local accounts or have an email on the member list.
+func (s *Server) allowed(u store.User) bool {
+	return !u.Disabled && ((u.Local && s.Local) || s.memberEmail(u.Email))
+}
+
+func (s *Server) memberEmail(email string) bool { return s.Members != nil && s.Members.Allows(email) }
+
+// startBrowserSession signs user in on this browser. method is recorded in the audit log.
+func (s *Server) startBrowserSession(w http.ResponseWriter, r *http.Request, user store.User, method string) error {
+	now := s.Now()
+	if err := s.Store.RecordLogin(r.Context(), user.ID, now); err != nil {
+		return err
+	}
+	token := store.NewToken()
+	if err := s.Store.CreateSession(r.Context(), store.HashToken(token), user, "browser", now.Add(browserSessionTTL), now); err != nil {
+		return err
+	}
+	s.audit(r.Context(), user, user.OrgID, "signin", user.ID, "method="+method)
+	s.setCookie(w, "fling_session", token, browserSessionTTL)
+	return nil
+}
+
+// signedInTarget is where a browser goes after signing in: back to a desktop sign-in that's
+// waiting for it, or the start page.
+func signedInTarget(desktopFlow string) string {
+	if desktopFlow != "" {
+		return "/auth/desktop/" + url.PathEscape(desktopFlow)
+	}
+	return "/"
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -300,7 +348,7 @@ func (s *Server) desktopConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 	user, _, ok := s.browserUser(r)
 	if !ok {
-		s.render(w, http.StatusOK, "signin", pageData{Title: "Sign in to Fling", Providers: s.providerButtons(flowID)})
+		s.render(w, http.StatusOK, "signin", s.signinPage("Sign in to Fling", flowID))
 		return
 	}
 	s.render(w, http.StatusOK, "desktop", pageData{Title: "Sign in to Fling", Email: user.Email, FormURL: "/auth/desktop/" + url.PathEscape(flowID)})
@@ -368,7 +416,7 @@ func (s *Server) token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user, err := s.Store.UserByID(r.Context(), f.UserID)
-	if err != nil || !s.Members.Allows(user.Email) {
+	if err != nil || !s.allowed(user) {
 		oauthError(w, "invalid_grant", "This account can't sign in.")
 		return
 	}
@@ -436,6 +484,21 @@ ul.links li:first-child{border-top:0}
 .name{overflow-wrap:anywhere}
 .meta{color:var(--muted);font:12px/16px "Cascadia Mono",Consolas,monospace;white-space:nowrap}
 .ok{color:var(--done)}
+label{display:grid;gap:4px;font-weight:600}
+input{font:inherit;font-weight:400;padding:7px 10px;border:1px solid var(--strong);border-radius:6px;background:var(--surface);color:var(--ink)}
+input:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+.or{display:flex;align-items:center;gap:8px;color:var(--muted);margin:16px 0}
+.or::before,.or::after{content:"";flex:1;border-top:1px solid var(--line)}
+.problem{color:var(--ink);background:var(--surface);border:1px solid var(--strong);border-radius:6px;padding:8px 12px}
+.problem::before{content:"\26A0\FE0E  "}
+.notice{border:1px solid var(--line);border-radius:6px;padding:8px 12px}
+.notice::before{content:"\2713  ";color:var(--done)}
+.small{font-size:12px;line-height:16px;color:var(--muted)}
+.codes{font:14px/24px "Cascadia Mono",Consolas,monospace;columns:2;padding:12px 16px;border:1px solid var(--line);border-radius:6px;margin:0 0 16px}
+.qr{display:block;width:200px;height:200px;margin:0 auto 16px;background:#fff;padding:8px;border-radius:6px}
+section{margin:0 0 24px}
+h2{font-size:16px;line-height:24px;margin:0 0 8px}
+[hidden]{display:none!important}
 </style></head><body>{{end}}
 
 {{define "logo"}}<div class="logo"><svg width="24" height="24" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="119.47" fill="#BD3514"/><circle cx="93.87" cy="426.67" r="21.33" fill="#FDE7DF"/><path d="M93.87 426.67 Q145.07 170.67 324.27 153.6" fill="none" stroke="#FDE7DF" stroke-width="42.67" stroke-linecap="round"/><circle cx="392.53" cy="162.13" r="55.47" fill="#F2B73A"/></svg><span>Fling Gateway</span></div>{{end}}
@@ -443,9 +506,22 @@ ul.links li:first-child{border-top:0}
 {{define "message"}}{{template "head" .}}<main class="center"><div class="card">{{template "logo"}}<h1>{{.Title}}</h1><p>{{.Message}}</p><a class="btn" href="/">Go to the start page</a></div></main></body></html>{{end}}
 
 {{define "signin"}}{{template "head" .}}<main class="center"><div class="card">{{template "logo"}}
-<h1>{{.Title}}</h1><p>Use your work or personal account. Only members of this gateway can sign in.</p>
-<div class="stack">{{range .Providers}}<a class="btn" href="{{.URL}}">Continue with {{.Name}}</a>{{else}}<p>No sign-in options are set up yet.</p>{{end}}</div>
-</div></main></body></html>{{end}}
+<h1>{{.Title}}</h1><p>Only members of this gateway can sign in.</p>
+{{if .Problem}}<p class="problem" role="alert">{{.Problem}}</p>{{end}}
+{{if .Local}}<div class="stack">
+<button class="btn primary" type="button" data-passkey-login data-flow="{{.Flow}}">Sign in with a passkey</button>
+<p class="problem" data-passkey-error role="alert" hidden></p></div>
+<div class="or">or</div>
+<form method="post" action="/auth/password" class="stack">
+<input type="hidden" name="flow" value="{{.Flow}}">
+<label>Email <input name="email" type="email" autocomplete="username webauthn" required value="{{.Email}}"></label>
+<label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+<button class="btn" type="submit">Sign in</button>
+</form>
+{{if .Mail}}<p class="small" style="margin:8px 0 0"><a href="/auth/forgot">Forgot your password?</a></p>{{end}}
+{{if .Providers}}<div class="or">or</div>{{end}}{{end}}
+<div class="stack">{{range .Providers}}<a class="btn" href="{{.URL}}">Continue with {{.Name}}</a>{{else}}{{if not .Local}}<p>No sign-in options are set up yet.</p>{{end}}{{end}}</div>
+</div></main>{{if .Local}}<script src="/static/fling.js" defer></script>{{end}}</body></html>{{end}}
 
 {{define "desktop"}}{{template "head" .}}<main class="center"><div class="card">{{template "logo"}}
 <h1>{{.Title}}</h1><p>Fling on your computer will share files as <strong>{{.Email}}</strong>.</p>
@@ -454,7 +530,7 @@ ul.links li:first-child{border-top:0}
 </div></main></body></html>{{end}}
 
 {{define "home"}}{{template "head" .}}<main class="wide">
-<div class="top">{{template "logo"}}<form method="post" action="/auth/logout"><span class="who">{{.Email}}</span> <button class="btn quiet" type="submit">Sign out</button></form></div>
+<div class="top">{{template "logo"}}<form method="post" action="/auth/logout"><a class="who" href="/account">{{.Email}}</a> <button class="btn quiet" type="submit">Sign out</button></form></div>
 <h1>Your links</h1><p>Share files with "Fling it" in File Explorer. Links you create appear here.</p>
 {{if .Links}}<ul class="links">{{range .Links}}<li><span class="name">{{.Name}}</span><span class="meta">{{if active . $.Now}}<span class="ok">Active</span> · expires {{date .ExpiresAt}}{{else if .RevokedAt}}Turned off{{else}}Expired{{end}} · {{.Downloads}} downloads</span></li>{{end}}</ul>
 {{else}}<p>No links yet.</p>{{end}}

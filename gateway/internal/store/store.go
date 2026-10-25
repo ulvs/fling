@@ -29,9 +29,11 @@ type Store struct {
 }
 
 type User struct {
-	ID    string
-	OrgID string
-	Email string
+	ID       string
+	OrgID    string
+	Email    string
+	Local    bool // a local account (invited), as opposed to a provider-only member
+	Disabled bool
 }
 
 type File struct {
@@ -172,7 +174,8 @@ func (s *Store) EnsureUser(ctx context.Context, orgID, email string, now time.Ti
 		return User{}, err
 	}
 	u := User{OrgID: orgID, Email: email}
-	err = s.db.QueryRowContext(ctx, `SELECT id FROM users WHERE org_id = ? AND email = ?`, orgID, email).Scan(&u.ID)
+	err = s.db.QueryRowContext(ctx, `SELECT id, local, disabled_at IS NOT NULL FROM users WHERE org_id = ? AND email = ?`, orgID, email).
+		Scan(&u.ID, &u.Local, &u.Disabled)
 	return u, err
 }
 

@@ -3,6 +3,8 @@
 #   docker compose -f compose.dev.yml up --build
 # Browser: http://localhost:8080, "Continue with Dev sign-in". On the fake login form, enter any
 #   user name and these claims:  {"email": "ann@example.com", "email_verified": true}
+# Local accounts: docker compose -f compose.dev.yml exec gateway fling-gateway user invite bo@example.com
+#   prints an invite link (no email in dev).
 # API calls:  Authorization: Bearer dev-token-change-me-0123456789abcdef
 services:
   s3-init:
@@ -57,6 +59,8 @@ services:
       FLING_OIDC_CLIENT_SECRET: fling-dev-secret
       FLING_OIDC_NAME: Dev sign-in
       FLING_MEMBER_EMAILS: ann@example.com
+      # Local accounts: docker compose -f compose.dev.yml exec gateway fling-gateway user invite bo@example.com
+      FLING_LOCAL_ACCOUNTS: "true"
     volumes:
       - gateway-data:/data
     network_mode: "service:s3"
