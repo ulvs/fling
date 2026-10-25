@@ -59,6 +59,7 @@ services:
       FLING_OIDC_CLIENT_SECRET: fling-dev-secret
       FLING_OIDC_NAME: Dev sign-in
       FLING_MEMBER_EMAILS: ann@example.com
+      FLING_ADMIN_EMAILS: ann@example.com   # admin pages at http://localhost:8080/admin
       # Local accounts: docker compose -f compose.dev.yml exec gateway fling-gateway user invite bo@example.com
       FLING_LOCAL_ACCOUNTS: "true"
     volumes:

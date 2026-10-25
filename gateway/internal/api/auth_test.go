@@ -223,8 +223,12 @@ func (h *harness) exchange(code, verifier, redirect string) *httptest.ResponseRe
 }
 
 // desktopCode runs the browser part of a desktop sign-in and returns the one-time code.
-func desktopCode(t *testing.T, b *browser, verifier, redirect string) string {
+func desktopCode(t *testing.T, b *browser, verifier, redirect string, who ...string) string {
 	t.Helper()
+	email := "ann@example.com"
+	if len(who) > 0 {
+		email = who[0]
+	}
 	page := b.get(desktopStart(verifier, redirect))
 	if page.status != http.StatusOK {
 		t.Fatalf("desktop start: %d %s", page.status, page.body)
@@ -235,7 +239,7 @@ func desktopCode(t *testing.T, b *browser, verifier, redirect string) string {
 		flow = strings.ReplaceAll(flow[:strings.Index(flow, `"`)], "&amp;", "&")
 		page = b.get(flow)
 	}
-	if !strings.Contains(page.body, "will share files as <strong>ann@example.com</strong>") {
+	if !strings.Contains(page.body, "will share files as <strong>"+email+"</strong>") {
 		t.Fatalf("confirm page: %d %s", page.status, page.body)
 	}
 	form := page.body[strings.Index(page.body, `action="`)+8:]

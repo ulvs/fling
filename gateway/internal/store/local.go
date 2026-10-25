@@ -21,14 +21,14 @@ type Account struct {
 	Passkeys     int
 }
 
-const accountColumns = `u.id, u.org_id, u.email, u.local, u.disabled_at IS NOT NULL, COALESCE(u.password_hash, ''),
+const accountColumns = `u.id, u.org_id, u.email, u.local, u.disabled_at IS NOT NULL, u.is_admin, COALESCE(u.password_hash, ''),
 	COALESCE(u.totp_secret, ''), COALESCE(u.totp_pending, ''), u.totp_last_step, u.webauthn_id, u.last_login_at,
 	(SELECT COUNT(*) FROM passkeys p WHERE p.user_id = u.id)`
 
 func scanAccount(row interface{ Scan(...any) error }) (Account, error) {
 	var a Account
 	var lastLogin sql.NullInt64
-	err := row.Scan(&a.ID, &a.OrgID, &a.Email, &a.Local, &a.Disabled, &a.PasswordHash, &a.TOTPSecret, &a.TOTPPending,
+	err := row.Scan(&a.ID, &a.OrgID, &a.Email, &a.Local, &a.Disabled, &a.Admin, &a.PasswordHash, &a.TOTPSecret, &a.TOTPPending,
 		&a.TOTPLastStep, &a.WebAuthnID, &lastLogin, &a.Passkeys)
 	if errors.Is(err, sql.ErrNoRows) {
 		return a, ErrNotFound

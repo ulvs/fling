@@ -98,6 +98,10 @@ func TestProviderNeedsMembersAndSecret(t *testing.T) {
 	if _, err := FromEnv(env(v)); err == nil || !strings.Contains(err.Error(), "FLING_MEMBER_EMAILS") {
 		t.Fatalf("want members error, got %v", err)
 	}
+	v["FLING_ADMIN_EMAILS"] = "Boss@Example.com"
+	if cfg, err := FromEnv(env(v)); err != nil || !cfg.Admins.Allows("boss@example.com") {
+		t.Fatalf("an admin list alone should do: %v", err)
+	}
 	v = valid()
 	delete(v, "FLING_GOOGLE_CLIENT_SECRET")
 	if _, err := FromEnv(env(v)); err == nil || !strings.Contains(err.Error(), "FLING_GOOGLE_CLIENT_SECRET") {

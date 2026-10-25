@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -100,6 +101,7 @@ type pageData struct {
 	Codes    []string
 	Account  *accountView
 	LinkCode string // invite/reset token, for the passkey button on the link page
+	Admin    bool   // show the link to the admin pages
 }
 
 func (s *Server) render(w http.ResponseWriter, status int, name string, d pageData) {
@@ -142,7 +144,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		s.page(w, http.StatusInternalServerError, "Something went wrong", "Try again in a moment.")
 		return
 	}
-	d := pageData{Title: "Your links", Email: user.Email, Now: s.Now()}
+	d := pageData{Title: "Your links", Email: user.Email, Now: s.Now(), Admin: s.isAdmin(user)}
 	for _, l := range links {
 		d.Links = append(d.Links, s.toLinkResponse(l))
 	}
@@ -234,7 +236,7 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	invited := err == nil && existing.Local && s.Local
-	if !invited && !s.memberEmail(id.Email) {
+	if !invited && !s.memberEmail(id.Email) && !s.adminEmail(id.Email) {
 		s.Log.Info("sign-in refused: not a member", "provider", p.ID)
 		s.audit(r.Context(), store.User{}, s.OrgID, "signin.refused", "", "provider="+p.ID)
 		s.page(w, http.StatusForbidden, "You're not a member yet", id.Email+" isn't on this gateway's member list. Ask your administrator to add you.")
@@ -257,12 +259,19 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 }
 
 // allowed decides who may use the gateway: accounts that aren't turned off, and are either
-// invited local accounts or have an email on the member list.
+// invited local accounts, on the member list, or admins by configuration.
 func (s *Server) allowed(u store.User) bool {
-	return !u.Disabled && ((u.Local && s.Local) || s.memberEmail(u.Email))
+	return !u.Disabled && ((u.Local && s.Local) || s.memberEmail(u.Email) || s.adminEmail(u.Email))
+}
+
+// isAdmin: an allowed account with the admin flag, or named in FLING_ADMIN_EMAILS.
+func (s *Server) isAdmin(u store.User) bool {
+	return s.allowed(u) && (u.Admin || s.adminEmail(u.Email))
 }
 
 func (s *Server) memberEmail(email string) bool { return s.Members != nil && s.Members.Allows(email) }
+
+func (s *Server) adminEmail(email string) bool { return s.Admins != nil && s.Admins.Allows(email) }
 
 // startBrowserSession signs user in on this browser. method is recorded in the audit log.
 func (s *Server) startBrowserSession(w http.ResponseWriter, r *http.Request, user store.User, method string) error {
@@ -453,6 +462,12 @@ func (s *Server) signOut(w http.ResponseWriter, r *http.Request) {
 
 var pages = template.Must(template.New("pages").Funcs(template.FuncMap{
 	"date": func(t time.Time) string { return t.UTC().Format("2006-01-02") },
+	"downloads": func(n int64) string {
+		if n == 1 {
+			return "1 download"
+		}
+		return strconv.FormatInt(n, 10) + " downloads"
+	},
 	"active": func(l linkResponse, now time.Time) bool {
 		return l.RevokedAt == nil && now.Before(l.ExpiresAt)
 	},
@@ -499,6 +514,26 @@ input:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
 section{margin:0 0 24px}
 h2{font-size:16px;line-height:24px;margin:0 0 8px}
 [hidden]{display:none!important}
+.admin{max-width:1040px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 24px}
+.tabs a{padding:8px 12px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs a[aria-current]{color:var(--ink);border-bottom-color:var(--fling);font-weight:600}
+.tabs a:focus-visible{outline:2px solid var(--ink)}
+table{width:100%;border-collapse:collapse;background:var(--raised);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:0 0 16px}
+th{text-align:left;font-weight:600;padding:8px 12px;border-bottom:1px solid var(--line);color:var(--muted)}
+td{padding:10px 12px;border-top:1px solid var(--line);vertical-align:top}
+tr.off td{opacity:.6}
+td.actions{text-align:right;white-space:nowrap}
+td.actions form{display:inline}
+.tag{font-size:12px;padding:0 6px;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.inline-form{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:0 0 8px}
+.inline-form label{min-width:260px}
+.inline-form .btn{width:auto}
+.sub{color:var(--muted);font-size:12px;line-height:16px}
+label.check{display:flex;flex-direction:row;align-items:center;gap:6px;min-width:0;font-weight:400}
+.linkbox{margin:0 0 16px}
+.linkbox input{width:100%;font:13px/20px "Cascadia Mono",Consolas,monospace}
 </style></head><body>{{end}}
 
 {{define "logo"}}<div class="logo"><svg width="24" height="24" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="119.47" fill="#BD3514"/><circle cx="93.87" cy="426.67" r="21.33" fill="#FDE7DF"/><path d="M93.87 426.67 Q145.07 170.67 324.27 153.6" fill="none" stroke="#FDE7DF" stroke-width="42.67" stroke-linecap="round"/><circle cx="392.53" cy="162.13" r="55.47" fill="#F2B73A"/></svg><span>Fling Gateway</span></div>{{end}}
@@ -530,9 +565,9 @@ h2{font-size:16px;line-height:24px;margin:0 0 8px}
 </div></main></body></html>{{end}}
 
 {{define "home"}}{{template "head" .}}<main class="wide">
-<div class="top">{{template "logo"}}<form method="post" action="/auth/logout"><a class="who" href="/account">{{.Email}}</a> <button class="btn quiet" type="submit">Sign out</button></form></div>
+<div class="top">{{template "logo"}}<form method="post" action="/auth/logout">{{if .Admin}}<a class="btn quiet" href="/admin">Admin</a> {{end}}<a class="who" href="/account">{{.Email}}</a> <button class="btn quiet" type="submit">Sign out</button></form></div>
 <h1>Your links</h1><p>Share files with "Fling it" in File Explorer. Links you create appear here.</p>
-{{if .Links}}<ul class="links">{{range .Links}}<li><span class="name">{{.Name}}</span><span class="meta">{{if active . $.Now}}<span class="ok">Active</span> · expires {{date .ExpiresAt}}{{else if .RevokedAt}}Turned off{{else}}Expired{{end}} · {{.Downloads}} downloads</span></li>{{end}}</ul>
+{{if .Links}}<ul class="links">{{range .Links}}<li><span class="name">{{.Name}}</span><span class="meta">{{if active . $.Now}}<span class="ok">Active</span> · expires {{date .ExpiresAt}}{{else if .RevokedAt}}Turned off{{else}}Expired{{end}} · {{downloads .Downloads}}</span></li>{{end}}</ul>
 {{else}}<p>No links yet.</p>{{end}}
 </main></body></html>{{end}}
 `))

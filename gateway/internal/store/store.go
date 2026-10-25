@@ -34,6 +34,7 @@ type User struct {
 	Email    string
 	Local    bool // a local account (invited), as opposed to a provider-only member
 	Disabled bool
+	Admin    bool // the admin flag in the database (FLING_ADMIN_EMAILS can also make someone an admin)
 }
 
 type File struct {
@@ -174,8 +175,8 @@ func (s *Store) EnsureUser(ctx context.Context, orgID, email string, now time.Ti
 		return User{}, err
 	}
 	u := User{OrgID: orgID, Email: email}
-	err = s.db.QueryRowContext(ctx, `SELECT id, local, disabled_at IS NOT NULL FROM users WHERE org_id = ? AND email = ?`, orgID, email).
-		Scan(&u.ID, &u.Local, &u.Disabled)
+	err = s.db.QueryRowContext(ctx, `SELECT id, local, disabled_at IS NOT NULL, is_admin FROM users WHERE org_id = ? AND email = ?`, orgID, email).
+		Scan(&u.ID, &u.Local, &u.Disabled, &u.Admin)
 	return u, err
 }
 

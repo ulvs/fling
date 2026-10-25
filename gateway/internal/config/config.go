@@ -56,6 +56,8 @@ type Config struct {
 	Microsoft OIDCProvider
 	Generic   OIDCProvider
 	Members   Members
+	// Admins may always sign in and see the admin pages (besides accounts with the admin flag).
+	Admins Members
 
 	// LocalAccounts enables accounts the gateway manages itself: invited by an admin,
 	// signing in with a passkey or a password (optionally with a two-step code).
@@ -148,6 +150,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 			Emails:  list(get("FLING_MEMBER_EMAILS", "")),
 			Domains: list(get("FLING_MEMBER_DOMAINS", "")),
 		},
+		Admins:           Members{Emails: list(get("FLING_ADMIN_EMAILS", ""))},
 		LocalAccounts:    boolean("FLING_LOCAL_ACCOUNTS", false),
 		RequireTwoFactor: boolean("FLING_REQUIRE_TWO_FACTOR", false),
 		Mail: Mail{
@@ -213,8 +216,8 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	switch {
 	case !cfg.AnyProvider() && !cfg.LocalAccounts && cfg.DevToken == "":
 		errs = append(errs, errors.New("configure a way to sign in: FLING_LOCAL_ACCOUNTS=true, a provider (FLING_GOOGLE_*, FLING_MICROSOFT_* or FLING_OIDC_*), or FLING_DEV_TOKEN for development"))
-	case cfg.AnyProvider() && len(cfg.Members.Emails) == 0 && len(cfg.Members.Domains) == 0:
-		errs = append(errs, errors.New("FLING_MEMBER_EMAILS or FLING_MEMBER_DOMAINS is required: nobody could sign in"))
+	case cfg.AnyProvider() && !cfg.LocalAccounts && len(cfg.Members.Emails) == 0 && len(cfg.Members.Domains) == 0 && len(cfg.Admins.Emails) == 0:
+		errs = append(errs, errors.New("FLING_MEMBER_EMAILS, FLING_MEMBER_DOMAINS or FLING_ADMIN_EMAILS is required: nobody could sign in"))
 	}
 	return cfg, errors.Join(errs...)
 }

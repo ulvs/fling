@@ -135,6 +135,7 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger, db *sto
 		Now:              time.Now,
 		Providers:        auth.Providers(cfg, nil),
 		Members:          cfg.Members,
+		Admins:           cfg.Admins,
 		OrgID:            defaultOrgID,
 		Local:            cfg.LocalAccounts,
 		RequireTwoFactor: cfg.RequireTwoFactor,

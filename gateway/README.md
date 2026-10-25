@@ -6,7 +6,7 @@ An optional server an organisation hosts between Fling and its S3-compatible sto
 - A share link (`/l/…`) redirects to a five-minute presigned download, so turning a link off takes effect immediately.
 - Members sign in with Microsoft, Google, or any other OpenID Connect provider. They can also have **local accounts**, invited by an admin, using passkeys or passwords with optional two-step codes. Fling on Windows signs in through the browser and receives its own token.
 
-Status: sign-in (M2) and local accounts with passkeys (M2b) work. Per-group rules, the admin pages and large-file uploads come later.
+Status: sign-in (M2), local accounts with passkeys (M2b) and the admin pages (M5) work. Per-group rules and large-file uploads come later.
 
 ## Run it locally
 
@@ -91,6 +91,7 @@ Everything is set through environment variables.
 | `FLING_GOOGLE_CLIENT_ID`, `FLING_GOOGLE_CLIENT_SECRET` | | Sign in with Google. |
 | `FLING_OIDC_ISSUER`, `FLING_OIDC_CLIENT_ID`, `FLING_OIDC_CLIENT_SECRET` | | Any other OpenID Connect provider (Okta, Keycloak, Authentik, …). |
 | `FLING_OIDC_NAME` | `single sign-on` | Button label for that provider. |
+| `FLING_ADMIN_EMAILS` | | Comma-separated addresses of admins. They can always sign in and see the admin pages at `/admin`. You can also make someone an admin from the admin pages or with `fling-gateway user admin`. |
 | `FLING_LOCAL_ACCOUNTS` | `false` | Local accounts: invited by an admin, signing in with a passkey or a password. |
 | `FLING_REQUIRE_TWO_FACTOR` | `false` | Password sign-ins must also give a code from an authenticator app. Passkeys already count as two factors. |
 | `FLING_RESEND_API_KEY`, `FLING_MAIL_FROM` | | Send invites and password resets through [Resend](https://resend.com), e.g. `FLING_MAIL_FROM="Fling <fling@example.com>"` on a domain verified in Resend. This also turns on "Forgot your password?". Without it, the admin passes links on by hand. |
@@ -123,6 +124,24 @@ Each provider redirects back to `<FLING_PUBLIC_URL>/auth/callback/<provider>`, w
 
 Google accounts sign in only when Google reports the email as verified.
 
+## Admin pages
+
+Admins see an **Admin** link on the start page, which leads to `/admin`. There are three tabs:
+
+- **People:**
+  - invite someone by email (sent through Resend, or shown as a link to pass on),
+  - reset someone's sign-in,
+  - sign someone out everywhere (including Fling on their computers),
+  - remove two-step codes,
+  - make or remove admins,
+  - turn accounts off and on.
+- **Links:** every link in the organisation, searchable by file name or email, with downloads and expiry. Turning a link off works at once.
+- **Activity:** the audit log of who did what and when: sign-ins, shares, downloads and admin actions.
+
+You can't turn off or demote yourself, so there's always an admin left. An admin named in `FLING_ADMIN_EMAILS` can only be removed from that setting. Every admin action is recorded in Activity.
+
+To make the first admin, set `FLING_ADMIN_EMAILS`, or run `fling-gateway user admin <email>` on the server.
+
 ## Local accounts
 
 Set `FLING_LOCAL_ACCOUNTS=true`. There's no open sign-up: an admin invites people.
@@ -133,6 +152,7 @@ docker exec <container> fling-gateway user reset ann@example.com    # 24-hour li
 docker exec <container> fling-gateway user disable ann@example.com  # turn off and sign out everywhere
 docker exec <container> fling-gateway user enable ann@example.com
 docker exec <container> fling-gateway user remove-codes ann@example.com  # lost phone and recovery codes
+docker exec <container> fling-gateway user admin ann@example.com    # or unadmin
 docker exec <container> fling-gateway user list
 ```
 

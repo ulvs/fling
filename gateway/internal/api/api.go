@@ -44,6 +44,7 @@ type Server struct {
 	// Sign-in: the configured providers, who may sign in, and the organisation new members join.
 	Providers []*auth.Provider
 	Members   Members
+	Admins    Members // FLING_ADMIN_EMAILS
 	OrgID     string
 
 	// Local accounts: invited users with passkeys, or passwords plus optional two-step codes.
@@ -103,6 +104,15 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /account/code/off", s.turnOffCodes)
 	mux.HandleFunc("POST /account/passkeys/{id}/remove", s.removePasskey)
 	mux.HandleFunc("GET /static/fling.js", s.script)
+	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/people", http.StatusSeeOther)
+	})
+	mux.HandleFunc("GET /admin/people", s.adminPeople)
+	mux.HandleFunc("POST /admin/people/invite", s.adminInvite)
+	mux.HandleFunc("POST /admin/people/{id}/{action}", s.adminPersonAction)
+	mux.HandleFunc("GET /admin/links", s.adminLinks)
+	mux.HandleFunc("POST /admin/links/{id}/revoke", s.adminRevokeLink)
+	mux.HandleFunc("GET /admin/activity", s.adminActivity)
 	mux.HandleFunc("POST /api/v1/token", s.token)
 	mux.Handle("GET /api/v1/me", s.auth(s.me))
 	mux.Handle("DELETE /api/v1/session", s.auth(s.signOut))

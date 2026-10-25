@@ -26,6 +26,8 @@ Commands:
   enable <email>     Turn it back on.
   remove-codes <email>
                      Turn off two-step codes, e.g. when someone lost their phone and recovery codes.
+  admin <email>      Make the account an admin (the admin pages are at /admin).
+  unadmin <email>    Remove admin rights.
   list               List accounts.
 `
 
@@ -62,7 +64,7 @@ func userCommand(args []string, stdout, stderr io.Writer) int {
 func runUserCommand(ctx context.Context, s *api.Server, cfg config.Config, args []string, out io.Writer) error {
 	cmd := args[0]
 	if cmd == "list" {
-		return listAccounts(ctx, s, out)
+		return listAccounts(ctx, s, cfg, out)
 	}
 	if len(args) != 2 {
 		return fmt.Errorf("usage: fling-gateway user %s <email>", cmd)
@@ -102,6 +104,7 @@ func runUserCommand(ctx context.Context, s *api.Server, cfg config.Config, args 
 		if link == "" {
 			return err
 		}
+		s.Store.Audit(ctx, store.AuditEvent{OrgID: user.OrgID, At: now, Action: "admin." + cmd, Target: user.ID, Detail: "via cli"})
 		switch {
 		case sent:
 			fmt.Fprintf(out, "Emailed the link to %s.\n", email)
@@ -125,6 +128,10 @@ func runUserCommand(ctx context.Context, s *api.Server, cfg config.Config, args 
 		err = s.Store.SetDisabled(ctx, a.ID, false, now)
 	case "remove-codes":
 		err = s.Store.DisableTOTP(ctx, a.ID)
+	case "admin":
+		err = s.Store.SetAdmin(ctx, a.ID, true)
+	case "unadmin":
+		err = s.Store.SetAdmin(ctx, a.ID, false)
 	default:
 		return fmt.Errorf("unknown command %q\n\n%s", cmd, userUsage)
 	}
@@ -136,13 +143,13 @@ func runUserCommand(ctx context.Context, s *api.Server, cfg config.Config, args 
 	return nil
 }
 
-func listAccounts(ctx context.Context, s *api.Server, out io.Writer) error {
+func listAccounts(ctx context.Context, s *api.Server, cfg config.Config, out io.Writer) error {
 	accounts, err := s.Store.ListAccounts(ctx, s.OrgID)
 	if err != nil {
 		return err
 	}
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "EMAIL\tTYPE\tSTATE\tPASSWORD\tCODES\tPASSKEYS\tLAST SIGN-IN")
+	fmt.Fprintln(tw, "EMAIL\tTYPE\tSTATE\tADMIN\tPASSWORD\tCODES\tPASSKEYS\tLAST SIGN-IN")
 	yesNo := func(b bool) string {
 		if b {
 			return "yes"
@@ -160,7 +167,8 @@ func listAccounts(ctx context.Context, s *api.Server, out io.Writer) error {
 		if a.LastLogin != nil {
 			last = a.LastLogin.UTC().Format(time.DateOnly)
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%d\t%s\n", a.Email, kind, state, yesNo(a.PasswordHash != ""), yesNo(a.TOTPSecret != ""), a.Passkeys, last)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\n", a.Email, kind, state, yesNo(a.Admin || cfg.Admins.Allows(a.Email)),
+			yesNo(a.PasswordHash != ""), yesNo(a.TOTPSecret != ""), a.Passkeys, last)
 	}
 	return tw.Flush()
 }
