@@ -1,0 +1,11 @@
+# Litestream copies every change of the gateway's database to a bucket within seconds.
+# Use a different bucket from the shared files: an expiry rule there would delete the backup.
+dbs:
+  - path: /data/fling-gateway.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: fling-gateway
+        endpoint: ${LITESTREAM_ENDPOINT}
+        region: ${LITESTREAM_REGION}
+        force-path-style: true

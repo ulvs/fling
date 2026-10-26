@@ -69,7 +69,11 @@ docker pull ghcr.io/ulvs/fling-gateway:latest
 | `latest` | The newest build from `main`. |
 | `sha-<commit>` | A specific commit. Pin this, or the image digest, in production, so updates only happen when you choose. |
 
-It needs S3-compatible storage, a volume for its SQLite database, and HTTPS in front of it (Caddy, Traefik, nginx, or a cloud load balancer). Configuration, sign-in providers, local accounts, the admin commands and a Docker Compose example are in [gateway/README.md](gateway/README.md).
+It needs S3-compatible storage, a volume for its SQLite database, and HTTPS in front of it (Caddy, Traefik, nginx, or a cloud load balancer).
+
+- [Run it on your own server](gateway/docs/deploy/docker-compose.md): Docker Compose with Caddy and Litestream backups, step by step.
+- [Admin guide](gateway/docs/admin.md): people, links, rules, activity, clean-up and troubleshooting.
+- [gateway/README.md](gateway/README.md): every setting, sign-in providers and local accounts.
 
 To try it locally, with a test S3 server and a fake sign-in provider:
 

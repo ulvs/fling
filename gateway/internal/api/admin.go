@@ -336,6 +336,8 @@ func describeAction(action string) string {
 		"admin.make-admin":      "made an admin:",
 		"admin.granted":         "made an admin:",
 		"admin.remove-admin":    "removed admin rights from",
+		"admin.admin":           "made an admin:",
+		"admin.unadmin":         "removed admin rights from",
 		"admin.link.revoke":     "turned off a link",
 		"admin.rules":           "changed the rules",
 		"admin.rules.reset":     "reset the rules to the server's settings",

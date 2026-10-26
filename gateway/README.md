@@ -30,6 +30,8 @@ The stack contains the gateway, a local S3 server (Versity Gateway) and a fake s
 
 ## Run it in production
 
+**Guides:** [your own server with Docker Compose](docs/deploy/docker-compose.md) (Caddy for HTTPS, Litestream for backups; tested end to end), and the [admin guide](docs/admin.md) for running it day to day. The short version:
+
 The image is `ghcr.io/ulvs/fling-gateway`, for amd64 and arm64. It runs as a non-root user and keeps everything in `/data`. Put it behind HTTPS (Caddy, Traefik, nginx or a cloud load balancer) and set `FLING_TRUSTED_PROXIES` to the proxy's address.
 
 ```yaml

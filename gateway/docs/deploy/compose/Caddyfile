@@ -1,0 +1,4 @@
+# Caddy gets and renews the HTTPS certificate itself. The name must point to this server.
+fling.example.com {
+	reverse_proxy gateway:8080
+}
