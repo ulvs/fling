@@ -176,6 +176,9 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	maxBytes, err := strconv.ParseInt(get("FLING_MAX_UPLOAD_BYTES", "2147483648"), 10, 64)
 	if err != nil || maxBytes <= 0 {
 		errs = append(errs, errors.New("FLING_MAX_UPLOAD_BYTES: must be a positive number of bytes"))
+	} else if maxBytes > 5<<30 {
+		// One presigned PUT carries at most 5 GiB (S3's limit) until uploads in parts arrive.
+		errs = append(errs, errors.New("FLING_MAX_UPLOAD_BYTES: at most 5368709120 (5 GiB) for now"))
 	}
 	cfg.Policy.MaxUploadBytes = maxBytes
 

@@ -181,3 +181,11 @@ func TestTrustedProxies(t *testing.T) {
 		t.Fatal("want error for a bad proxy")
 	}
 }
+
+func TestMaxUploadCappedAtFiveGiB(t *testing.T) {
+	v := valid()
+	v["FLING_MAX_UPLOAD_BYTES"] = "6000000000"
+	if _, err := FromEnv(env(v)); err == nil || !strings.Contains(err.Error(), "5 GiB") {
+		t.Fatalf("want 5 GiB error, got %v", err)
+	}
+}

@@ -6,7 +6,7 @@ An optional server an organisation hosts between Fling and its S3-compatible sto
 - A share link (`/l/…`) redirects to a five-minute presigned download, so turning a link off takes effect immediately.
 - Members sign in with Microsoft, Google, or any other OpenID Connect provider. They can also have **local accounts**, invited by an admin, using passkeys or passwords with optional two-step codes. Fling on Windows signs in through the browser and receives its own token.
 
-Status: sign-in (M2), local accounts with passkeys (M2b) and the admin pages (M5) work. Per-group rules and large-file uploads come later.
+Status: sign-in (M2), local accounts with passkeys (M2b), the admin pages (M5) and organisation-wide rules (M4) work. Rules per group and large-file uploads come later.
 
 ## Run it locally
 
@@ -82,8 +82,8 @@ Everything is set through environment variables.
 | `FLING_S3_ENDPOINT`, `FLING_S3_BUCKET`, `FLING_S3_ACCESS_KEY`, `FLING_S3_SECRET_KEY` | required | The storage. The key only needs to read and write objects in that bucket. |
 | `FLING_S3_REGION` | `us-east-1` | |
 | `FLING_S3_PATH_STYLE` | `true` | Path-style addressing (MinIO, B2, R2). |
-| `FLING_DEFAULT_LINK_TTL`, `FLING_MAX_LINK_TTL` | `168h`, `720h` | How long links last, by default and at most. |
-| `FLING_MAX_UPLOAD_BYTES` | `2147483648` | Largest upload (2 GiB). |
+| `FLING_DEFAULT_LINK_TTL`, `FLING_MAX_LINK_TTL` | `168h`, `720h` | How long links last, by default and at most. Admins can override these on the Rules page. |
+| `FLING_MAX_UPLOAD_BYTES` | `2147483648` | Largest upload (2 GiB), at most 5 GiB until uploads in parts arrive. Admins can override it on the Rules page. |
 | `FLING_MEMBER_EMAILS` | | Comma-separated addresses that may sign in. |
 | `FLING_MEMBER_DOMAINS` | | Comma-separated domains whose addresses may sign in, e.g. `example.com`. |
 | `FLING_MICROSOFT_CLIENT_ID`, `FLING_MICROSOFT_CLIENT_SECRET` | | Sign in with Microsoft. |
@@ -136,6 +136,12 @@ Admins see an **Admin** link on the start page, which leads to `/admin`. There a
   - make or remove admins,
   - turn accounts off and on.
 - **Links:** every link in the organisation, searchable by file name or email, with downloads and expiry. Turning a link off works at once.
+- **Rules:** settings for the whole organisation, overriding the server's settings:
+  - default and longest link lifetime,
+  - largest file,
+  - blocked file types, or a list of the only file types allowed.
+
+  Fling on Windows shows the gateway's reason when a file is refused.
 - **Activity:** the audit log of who did what and when: sign-ins, shares, downloads and admin actions.
 
 You can't turn off or demote yourself, so there's always an admin left. An admin named in `FLING_ADMIN_EMAILS` can only be removed from that setting. Every admin action is recorded in Activity.

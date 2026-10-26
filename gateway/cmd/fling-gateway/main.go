@@ -129,7 +129,7 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger, db *sto
 	server := &api.Server{
 		Store:            db,
 		Objects:          objects,
-		Policy:           policy.Policy(cfg.Policy),
+		Policy:           policy.Policy{DefaultTTL: cfg.Policy.DefaultTTL, MaxTTL: cfg.Policy.MaxTTL, MaxUploadBytes: cfg.Policy.MaxUploadBytes},
 		PublicURL:        cfg.PublicURL,
 		Log:              log,
 		Now:              time.Now,

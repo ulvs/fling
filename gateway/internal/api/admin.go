@@ -333,6 +333,8 @@ func describeAction(action string) string {
 		"admin.granted":         "made an admin:",
 		"admin.remove-admin":    "removed admin rights from",
 		"admin.link.revoke":     "turned off a link",
+		"admin.rules":           "changed the rules",
+		"admin.rules.reset":     "reset the rules to the server's settings",
 	}[action]; ok {
 		return d
 	}
@@ -370,6 +372,7 @@ const adminPages = `
 <nav class="tabs" aria-label="Admin">
 <a href="/admin/people"{{if eq .Tab "people"}} aria-current="page"{{end}}>People</a>
 <a href="/admin/links"{{if eq .Tab "links"}} aria-current="page"{{end}}>Links</a>
+<a href="/admin/rules"{{if eq .Tab "rules"}} aria-current="page"{{end}}>Rules</a>
 <a href="/admin/activity"{{if eq .Tab "activity"}} aria-current="page"{{end}}>Activity</a>
 </nav>
 {{if .Notice}}<p class="notice" role="status">{{.Notice}}</p>{{end}}

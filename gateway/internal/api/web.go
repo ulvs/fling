@@ -530,6 +530,9 @@ td.actions form{display:inline}
 .inline-form{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:0 0 8px}
 .inline-form label{min-width:260px}
 .inline-form .btn{width:auto}
+.rules{max-width:480px}
+.rules .btn{width:auto}
+.rules .small{margin:-4px 0 4px}
 .sub{color:var(--muted);font-size:12px;line-height:16px}
 label.check{display:flex;flex-direction:row;align-items:center;gap:6px;min-width:0;font-weight:400}
 .linkbox{margin:0 0 16px}

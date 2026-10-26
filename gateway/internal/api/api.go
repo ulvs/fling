@@ -113,6 +113,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin/links", s.adminLinks)
 	mux.HandleFunc("POST /admin/links/{id}/revoke", s.adminRevokeLink)
 	mux.HandleFunc("GET /admin/activity", s.adminActivity)
+	mux.HandleFunc("GET /admin/rules", s.adminRules)
+	mux.HandleFunc("POST /admin/rules", s.adminSaveRules)
+	mux.HandleFunc("POST /admin/rules/reset", s.adminResetRules)
 	mux.HandleFunc("POST /api/v1/token", s.token)
 	mux.Handle("GET /api/v1/me", s.auth(s.me))
 	mux.Handle("DELETE /api/v1/session", s.auth(s.signOut))
@@ -320,7 +323,12 @@ func (s *Server) createUpload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "bad_name", "The file name is empty or too long.")
 		return
 	}
-	if err := s.Policy.CheckUpload(req.Size); err != nil {
+	pol, err := s.policyFor(r.Context(), user.OrgID)
+	if err != nil {
+		s.internalError(w, "load rules", err)
+		return
+	}
+	if err := pol.CheckFile(name, req.Size); err != nil {
 		var v *policy.Violation
 		if errors.As(err, &v) {
 			writeError(w, http.StatusUnprocessableEntity, v.Code, v.Message)
@@ -342,7 +350,7 @@ func (s *Server) createUpload(w http.ResponseWriter, r *http.Request) {
 		Name:        name,
 		Size:        req.Size,
 		ContentType: contentType,
-		LinkTTL:     s.Policy.LinkTTL(time.Duration(req.TTLSeconds) * time.Second),
+		LinkTTL:     pol.LinkTTL(time.Duration(req.TTLSeconds) * time.Second),
 		CreatedAt:   now,
 	}
 	f.ObjectKey = user.OrgID + "/" + f.ID + "/" + name
