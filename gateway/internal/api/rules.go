@@ -39,6 +39,8 @@ func (s *Server) policyFor(ctx context.Context, orgID string) (policy.Policy, er
 type rulesForm struct {
 	DefaultDays, MaxDays, MaxMB string
 	Blocked, Allowed            string
+	MembersOnly                 bool
+	MaxDownloads                string
 }
 
 type rulesData struct {
@@ -51,6 +53,8 @@ type rulesData struct {
 	UpdatedAt              time.Time
 	UpdatedBy              string
 	Custom                 bool
+	EffectiveMembersOnly   bool
+	EffectiveMaxDownloads  int64
 	HardMaxDays, HardMaxMB int
 }
 
@@ -69,7 +73,7 @@ func (s *Server) adminRules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.renderRules(w, r, admin, http.StatusOK, nil, adminData{Notice: map[string]string{
-		"saved": "Rules saved. They apply to new uploads.", "reset": "Back to the server's settings.",
+		"saved": "Rules saved. Upload rules apply to new uploads; download rules apply to every link at once.", "reset": "Back to the server's settings.",
 	}[r.URL.Query().Get("done")]})
 }
 
@@ -89,6 +93,10 @@ func (s *Server) renderRules(w http.ResponseWriter, r *http.Request, admin store
 		ServerDefaultDays: days(s.Policy.DefaultTTL), ServerMaxDays: days(s.Policy.MaxTTL), ServerMaxMB: megabytes(s.Policy.MaxUploadBytes),
 		HardMaxDays: int(policy.MaxLinkTTL / day), HardMaxMB: policy.MaxSingleUpload >> 20}
 	d.Title, d.Tab, d.Email = "Rules", "rules", admin.Email
+	d.EffectiveMembersOnly = stored.MembersOnly
+	if stored.MaxDownloads != nil {
+		d.EffectiveMaxDownloads = *stored.MaxDownloads
+	}
 	if form != nil {
 		d.Form = *form
 	} else {
@@ -103,6 +111,10 @@ func (s *Server) renderRules(w http.ResponseWriter, r *http.Request, admin store
 		}
 		d.Form.Blocked = strings.Join(policy.ParseTypes(stored.BlockedTypes), ", ")
 		d.Form.Allowed = strings.Join(policy.ParseTypes(stored.AllowedTypes), ", ")
+		d.Form.MembersOnly = stored.MembersOnly
+		if stored.MaxDownloads != nil {
+			d.Form.MaxDownloads = strconv.FormatInt(*stored.MaxDownloads, 10)
+		}
 	}
 	d.Now, d.PublicURL = s.Now(), s.PublicURL
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -118,11 +130,13 @@ func (s *Server) adminSaveRules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	form := rulesForm{
-		DefaultDays: strings.TrimSpace(r.PostFormValue("default_days")),
-		MaxDays:     strings.TrimSpace(r.PostFormValue("max_days")),
-		MaxMB:       strings.TrimSpace(r.PostFormValue("max_mb")),
-		Blocked:     r.PostFormValue("blocked"),
-		Allowed:     r.PostFormValue("allowed"),
+		DefaultDays:  strings.TrimSpace(r.PostFormValue("default_days")),
+		MaxDays:      strings.TrimSpace(r.PostFormValue("max_days")),
+		MaxMB:        strings.TrimSpace(r.PostFormValue("max_mb")),
+		Blocked:      r.PostFormValue("blocked"),
+		Allowed:      r.PostFormValue("allowed"),
+		MembersOnly:  r.PostFormValue("download") == "members",
+		MaxDownloads: strings.TrimSpace(r.PostFormValue("max_downloads")),
 	}
 	problem := func(msg string) {
 		s.renderRules(w, r, admin, http.StatusUnprocessableEntity, &form, adminData{Problem: msg})
@@ -151,6 +165,10 @@ func (s *Server) adminSaveRules(w http.ResponseWriter, r *http.Request) {
 	if !ok3 {
 		return
 	}
+	maxDownloads, ok4 := whole(form.MaxDownloads, 1, 100000, "Downloads per link")
+	if !ok4 {
+		return
+	}
 
 	var rules store.Rules
 	if defDays != nil {
@@ -176,6 +194,8 @@ func (s *Server) adminSaveRules(w http.ResponseWriter, r *http.Request) {
 		problem("The longest link lifetime can't be shorter than the default.")
 		return
 	}
+	rules.MaxDownloads = maxDownloads
+	rules.MembersOnly = form.MembersOnly
 	rules.BlockedTypes = strings.Join(policy.ParseTypes(form.Blocked), ", ")
 	rules.AllowedTypes = strings.Join(policy.ParseTypes(form.Allowed), ", ")
 
@@ -184,7 +204,8 @@ func (s *Server) adminSaveRules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.audit(r.Context(), admin, admin.OrgID, "admin.rules", "",
-		fmt.Sprintf("default=%s max=%s size=%s blocked=%q allowed=%q", form.DefaultDays, form.MaxDays, form.MaxMB, rules.BlockedTypes, rules.AllowedTypes))
+		fmt.Sprintf("default=%s max=%s size=%s blocked=%q allowed=%q members_only=%t max_downloads=%s",
+			form.DefaultDays, form.MaxDays, form.MaxMB, rules.BlockedTypes, rules.AllowedTypes, rules.MembersOnly, form.MaxDownloads))
 	http.Redirect(w, r, "/admin/rules?done=saved", http.StatusSeeOther)
 }
 
@@ -225,11 +246,18 @@ const rulesPage = `
 <label>Blocked file types <input name="blocked" value="{{.Form.Blocked}}" placeholder=".exe, .bat, .msi"></label>
 <label>Only allow these file types <input name="allowed" value="{{.Form.Allowed}}" placeholder="Leave empty to allow everything not blocked"></label>
 <p class="small">Fling sends several files or a folder as one .zip, so add .zip if you only allow some types.</p>
+<fieldset class="stack"><legend>Who can download</legend>
+<label class="check"><input type="radio" name="download" value="anyone"{{if not .Form.MembersOnly}} checked{{end}}> Anyone with the link</label>
+<label class="check"><input type="radio" name="download" value="members"{{if .Form.MembersOnly}} checked{{end}}> Only people signed in to this gateway</label>
+</fieldset>
+<p class="small">Members-only links ask for sign-in first, and the activity log shows who downloaded.</p>
+<label>Downloads per link <input name="max_downloads" type="number" min="1" max="100000" value="{{.Form.MaxDownloads}}" placeholder="No limit"></label>
 <div><button class="btn primary" type="submit">Save rules</button></div>
 </form>
 <section style="margin-top:24px"><h2>In effect now</h2>
 <p class="sub">Links last {{days .Effective.DefaultTTL}} days by default and at most {{days .Effective.MaxTTL}} days. Files up to {{megabytes .Effective.MaxUploadBytes}} MB.
 {{if .Effective.BlockedTypes}} Blocked: {{joinTypes .Effective.BlockedTypes}}.{{end}}{{if .Effective.AllowedTypes}} Only: {{joinTypes .Effective.AllowedTypes}}.{{end}}
+{{if .EffectiveMembersOnly}} Only signed-in members can download.{{else}} Anyone with the link can download.{{end}}{{if .EffectiveMaxDownloads}} Each link works for {{.EffectiveMaxDownloads}} downloads.{{end}}
 {{if .Custom}} Last changed {{when .UpdatedAt}} UTC{{if .UpdatedBy}} by {{.UpdatedBy}}{{end}}.{{end}}</p>
 {{if .Custom}}<form method="post" action="/admin/rules/reset"><button class="btn quiet" type="submit">Go back to the server's settings</button></form>{{end}}
 </section>

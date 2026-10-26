@@ -318,7 +318,7 @@ func describeAction(action string) string {
 		"upload.start":          "started an upload",
 		"upload.complete":       "shared a file",
 		"link.revoke":           "turned off their link",
-		"link.download":         "link downloaded",
+		"link.download":         "downloaded a file",
 		"password.set":          "set a password",
 		"password.changed":      "changed their password",
 		"passkey.added":         "added a passkey",

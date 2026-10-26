@@ -492,6 +492,31 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rules, _, err := s.Store.OrgRules(r.Context(), l.OrgID)
+	if err != nil {
+		s.Log.Error("load rules", "err", err)
+		s.page(w, http.StatusInternalServerError, "Something went wrong", "Try again in a moment.")
+		return
+	}
+	if rules.MaxDownloads != nil && l.DownloadCount >= *rules.MaxDownloads {
+		s.page(w, http.StatusGone, "This link has been used up",
+			fmt.Sprintf("It could be downloaded %d times. Ask the person who shared it for a new one.", *rules.MaxDownloads))
+		return
+	}
+	downloader := store.User{}
+	if rules.MembersOnly {
+		u, _, ok := s.browserUser(r)
+		if !ok || u.OrgID != l.OrgID {
+			// Sign in first, then come straight back here.
+			s.setCookie(w, returnCookie, "/l/"+r.PathValue("slug"), loginTTL)
+			d := s.signinPage("Sign in to download", "")
+			d.Message = "This file is only for members of this gateway. Sign in, and the download starts."
+			s.render(w, http.StatusUnauthorized, "signin", d)
+			return
+		}
+		downloader = u
+	}
+
 	url, err := s.Objects.PresignGet(r.Context(), l.File.ObjectKey, l.File.Name, downloadURLTTL)
 	if err != nil {
 		s.Log.Error("presign get", "err", err)
@@ -501,7 +526,7 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 	if err := s.Store.CountDownload(r.Context(), l.ID); err != nil {
 		s.Log.Error("count download", "err", err)
 	}
-	s.audit(r.Context(), store.User{}, l.OrgID, "link.download", l.ID, "")
+	s.audit(r.Context(), downloader, l.OrgID, "link.download", l.ID, "")
 	http.Redirect(w, r, url, http.StatusFound)
 }
 

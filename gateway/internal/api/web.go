@@ -251,11 +251,7 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 		s.page(w, http.StatusInternalServerError, "Something went wrong", "Try again in a moment.")
 		return
 	}
-	target := ls.ReturnTo
-	if ls.DesktopFlow != "" {
-		target = signedInTarget(ls.DesktopFlow)
-	}
-	http.Redirect(w, r, target, http.StatusSeeOther)
+	http.Redirect(w, r, s.signedInTarget(w, r, ls.DesktopFlow), http.StatusSeeOther)
 }
 
 // allowed decides who may use the gateway: accounts that aren't turned off, and are either
@@ -288,11 +284,31 @@ func (s *Server) startBrowserSession(w http.ResponseWriter, r *http.Request, use
 	return nil
 }
 
+// returnCookie remembers a members-only download someone has to sign in for.
+const returnCookie = "fling_return"
+
+// validReturn accepts only a download link path, so the cookie can't send anyone elsewhere.
+func validReturn(path string) bool {
+	if !strings.HasPrefix(path, "/l/") || len(path) > 100 {
+		return false
+	}
+	slug := path[3:]
+	return slug != "" && strings.IndexFunc(slug, func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_')
+	}) < 0
+}
+
 // signedInTarget is where a browser goes after signing in: back to a desktop sign-in that's
-// waiting for it, or the start page.
-func signedInTarget(desktopFlow string) string {
+// waiting for it, to the download it signed in for, or the start page.
+func (s *Server) signedInTarget(w http.ResponseWriter, r *http.Request, desktopFlow string) string {
 	if desktopFlow != "" {
 		return "/auth/desktop/" + url.PathEscape(desktopFlow)
+	}
+	if c, err := r.Cookie(s.cookieName(returnCookie)); err == nil {
+		s.clearCookie(w, returnCookie)
+		if validReturn(c.Value) {
+			return c.Value
+		}
 	}
 	return "/"
 }
@@ -533,6 +549,8 @@ td.actions form{display:inline}
 .rules{max-width:480px}
 .rules .btn{width:auto}
 .rules .small{margin:-4px 0 4px}
+fieldset{border:0;padding:0;margin:0}
+legend{font-weight:600;padding:0;margin-bottom:4px}
 .sub{color:var(--muted);font-size:12px;line-height:16px}
 label.check{display:flex;flex-direction:row;align-items:center;gap:6px;min-width:0;font-weight:400}
 .linkbox{margin:0 0 16px}
@@ -544,7 +562,7 @@ label.check{display:flex;flex-direction:row;align-items:center;gap:6px;min-width
 {{define "message"}}{{template "head" .}}<main class="center"><div class="card">{{template "logo"}}<h1>{{.Title}}</h1><p>{{.Message}}</p><a class="btn" href="/">Go to the start page</a></div></main></body></html>{{end}}
 
 {{define "signin"}}{{template "head" .}}<main class="center"><div class="card">{{template "logo"}}
-<h1>{{.Title}}</h1><p>Only members of this gateway can sign in.</p>
+<h1>{{.Title}}</h1><p>{{if .Message}}{{.Message}}{{else}}Only members of this gateway can sign in.{{end}}</p>
 {{if .Problem}}<p class="problem" role="alert">{{.Problem}}</p>{{end}}
 {{if .Local}}<div class="stack">
 <button class="btn primary" type="button" data-passkey-login data-flow="{{.Flow}}">Sign in with a passkey</button>

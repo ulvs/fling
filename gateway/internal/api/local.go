@@ -77,7 +77,7 @@ func (s *Server) passwordSignIn(w http.ResponseWriter, r *http.Request) {
 			s.internalPage(w, "start session", err)
 			return
 		}
-		http.Redirect(w, r, signedInTarget(flow), http.StatusSeeOther)
+		http.Redirect(w, r, s.signedInTarget(w, r, flow), http.StatusSeeOther)
 	}
 }
 
@@ -157,7 +157,7 @@ func (s *Server) codeSubmit(w http.ResponseWriter, r *http.Request) {
 		s.internalPage(w, "start session", err)
 		return
 	}
-	http.Redirect(w, r, signedInTarget(st.DesktopFlow), http.StatusSeeOther)
+	http.Redirect(w, r, s.signedInTarget(w, r, st.DesktopFlow), http.StatusSeeOther)
 }
 
 // checkSecondFactor accepts a current authenticator code (once) or an unused recovery code.
@@ -258,7 +258,7 @@ func (s *Server) codeSetupSubmit(w http.ResponseWriter, r *http.Request) {
 			s.internalPage(w, "start session", err)
 			return
 		}
-		next = signedInTarget(flow)
+		next = s.signedInTarget(w, r, flow)
 	}
 	s.render(w, http.StatusOK, "recovery-codes", pageData{Title: "Save your recovery codes", Codes: codes, FormURL: next})
 }

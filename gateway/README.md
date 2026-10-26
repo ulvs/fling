@@ -6,7 +6,7 @@ An optional server an organisation hosts between Fling and its S3-compatible sto
 - A share link (`/l/…`) redirects to a five-minute presigned download, so turning a link off takes effect immediately.
 - Members sign in with Microsoft, Google, or any other OpenID Connect provider. They can also have **local accounts**, invited by an admin, using passkeys or passwords with optional two-step codes. Fling on Windows signs in through the browser and receives its own token.
 
-Status: sign-in (M2), local accounts with passkeys (M2b), the admin pages (M5), organisation-wide rules (M4) and the storage clean-up (M6) work. Rules per group and uploads over 5 GiB come later.
+Status: sign-in (M2), local accounts with passkeys (M2b), the admin pages (M5), organisation-wide rules (M4), the storage clean-up (M6) and download options (M7: members-only links, download limits) work. Rules per group and uploads over 5 GiB come later.
 
 ## Run it locally
 
@@ -141,9 +141,11 @@ Admins see an **Admin** link on the start page, which leads to `/admin`. There a
 - **Rules:** settings for the whole organisation, overriding the server's settings:
   - default and longest link lifetime,
   - largest file,
-  - blocked file types, or a list of the only file types allowed.
+  - blocked file types, or a list of the only file types allowed,
+  - who can download: anyone with the link, or only people signed in to the gateway,
+  - a limit on downloads per link.
 
-  Fling on Windows shows the gateway's reason when a file is refused.
+  Fling on Windows shows the gateway's reason when a file is refused. Members-only links show a sign-in page first, then go straight on to the download, and Activity shows who downloaded. Download rules apply to every link at once; upload rules apply to new uploads.
 - **Activity:** the audit log of who did what and when: sign-ins, shares, downloads and admin actions.
 
 You can't turn off or demote yourself, so there's always an admin left. An admin named in `FLING_ADMIN_EMAILS` can only be removed from that setting. Every admin action is recorded in Activity.

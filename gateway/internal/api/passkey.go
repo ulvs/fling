@@ -289,7 +289,7 @@ func (s *Server) passkeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, "start session", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"redirect": signedInTarget(st.DesktopFlow)})
+	writeJSON(w, http.StatusOK, map[string]string{"redirect": s.signedInTarget(w, r, st.DesktopFlow)})
 }
 
 // ---- the page script ----------------------------------------------------------------
