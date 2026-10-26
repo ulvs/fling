@@ -56,7 +56,7 @@ func humanDelay(d time.Duration) string {
 		return strconv.Itoa(int(d/(24*time.Hour))) + " days"
 	case d == time.Hour:
 		return "an hour"
-	case d >= time.Hour:
+	case d%time.Hour == 0:
 		return strconv.Itoa(int(d.Hours())) + " hours"
 	}
 	return d.String()

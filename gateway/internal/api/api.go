@@ -498,9 +498,12 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 		s.page(w, http.StatusInternalServerError, "Something went wrong", "Try again in a moment.")
 		return
 	}
-	if rules.MaxDownloads != nil && l.DownloadCount >= *rules.MaxDownloads {
+	usedUp := func() {
 		s.page(w, http.StatusGone, "This link has been used up",
 			fmt.Sprintf("It could be downloaded %d times. Ask the person who shared it for a new one.", *rules.MaxDownloads))
+	}
+	if rules.MaxDownloads != nil && l.DownloadCount >= *rules.MaxDownloads {
+		usedUp()
 		return
 	}
 	downloader := store.User{}
@@ -516,15 +519,30 @@ func (s *Server) download(w http.ResponseWriter, r *http.Request) {
 		}
 		downloader = u
 	}
+	if r.Method == http.MethodHead {
+		// Link previews and scanners often only look; that isn't a download.
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
+	claimed, err := s.Store.ClaimDownload(r.Context(), l.ID, rules.MaxDownloads)
+	if err != nil {
+		s.Log.Error("count download", "err", err)
+		s.page(w, http.StatusInternalServerError, "Something went wrong", "Try again in a moment.")
+		return
+	}
+	if !claimed {
+		usedUp()
+		return
+	}
 	url, err := s.Objects.PresignGet(r.Context(), l.File.ObjectKey, l.File.Name, downloadURLTTL)
 	if err != nil {
 		s.Log.Error("presign get", "err", err)
+		if err := s.Store.UnclaimDownload(r.Context(), l.ID); err != nil {
+			s.Log.Error("uncount download", "err", err)
+		}
 		s.page(w, http.StatusBadGateway, "The file isn't reachable right now", "Try again in a moment.")
 		return
-	}
-	if err := s.Store.CountDownload(r.Context(), l.ID); err != nil {
-		s.Log.Error("count download", "err", err)
 	}
 	s.audit(r.Context(), downloader, l.OrgID, "link.download", l.ID, "")
 	http.Redirect(w, r, url, http.StatusFound)

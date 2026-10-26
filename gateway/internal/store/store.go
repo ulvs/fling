@@ -292,8 +292,27 @@ func (s *Store) RevokeLink(ctx context.Context, orgID, ownerID, linkID string, n
 	return nil
 }
 
-func (s *Store) CountDownload(ctx context.Context, linkID string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE links SET download_count = download_count + 1 WHERE id = ?`, linkID)
+// ClaimDownload counts a download, but only while the link is under limit (nil: no limit).
+// Check and count are one statement, so simultaneous requests can't both take the last one.
+// It reports false when the link is used up.
+func (s *Store) ClaimDownload(ctx context.Context, linkID string, limit *int64) (bool, error) {
+	var max any
+	if limit != nil {
+		max = *limit
+	}
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE links SET download_count = download_count + 1 WHERE id = ? AND (? IS NULL OR download_count < ?)`,
+		linkID, max, max)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
+// UnclaimDownload gives back a claimed download that couldn't be served.
+func (s *Store) UnclaimDownload(ctx context.Context, linkID string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE links SET download_count = download_count - 1 WHERE id = ? AND download_count > 0`, linkID)
 	return err
 }
 

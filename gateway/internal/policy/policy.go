@@ -46,7 +46,8 @@ func ParseTypes(raw string) []string {
 }
 
 func matchesType(name string, types []string) bool {
-	name = strings.ToLower(name)
+	// Windows drops trailing dots and spaces when saving, so "setup.exe. " is an .exe.
+	name = strings.ToLower(strings.TrimRight(name, ". "))
 	for _, t := range types {
 		if strings.HasSuffix(name, t) && len(name) > len(t) {
 			return true

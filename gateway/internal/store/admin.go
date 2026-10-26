@@ -56,8 +56,9 @@ func (s *Store) ListOrgLinks(ctx context.Context, orgID string, f LinkFilter, no
 		WHERE l.org_id = ?`
 	args := []any{orgID}
 	if term := strings.TrimSpace(f.Search); term != "" {
-		like := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(strings.ToLower(term)) + "%"
-		query += ` AND (LOWER(f.name) LIKE ? ESCAPE '\' OR u.email LIKE ? ESCAPE '\')`
+		// LIKE ignores case for ASCII letters; other letters (Å, Ä, Ö) match as typed.
+		like := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(term) + "%"
+		query += ` AND (f.name LIKE ? ESCAPE '\' OR u.email LIKE ? ESCAPE '\')`
 		args = append(args, like, like)
 	}
 	if f.ActiveOnly {

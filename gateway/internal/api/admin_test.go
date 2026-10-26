@@ -238,3 +238,25 @@ func TestAdminActivity(t *testing.T) {
 		t.Fatal("sign-ins should be listed")
 	}
 }
+
+func TestAdminLinkSearchIsAsTyped(t *testing.T) {
+	h := newHarness(t)
+	admin, _ := withAdmin(t, h)
+	h.upload("Ärende 42.pdf", 10, 3600)
+	h.upload("Quarterly.pdf", 10, 3600)
+	for term, want := range map[string]string{
+		"Ärende":    "Ärende 42.pdf", // non-ASCII capitals match as typed
+		"QUARTERLY": "Quarterly.pdf", // ASCII ignores case
+		"dev@":      "Quarterly.pdf", // the sharer's email
+		"100%":      "",              // % is a literal, not a wildcard
+	} {
+		page := admin.get("/admin/links?q=" + url.QueryEscape(term))
+		if want == "" {
+			if strings.Contains(page.body, ".pdf</span>") {
+				t.Errorf("%q matched something", term)
+			}
+		} else if !strings.Contains(page.body, want) {
+			t.Errorf("%q didn't find %s", term, want)
+		}
+	}
+}

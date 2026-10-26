@@ -2,8 +2,10 @@ package api
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -110,5 +112,47 @@ func TestReturnAddressIsOnlyADownloadLink(t *testing.T) {
 		[]byte(url.Values{"email": {bo}, "password": {password}}.Encode()))
 	if got := rec.Header().Get("Location"); got != "/" {
 		t.Fatalf("a forged return address was followed: %q", got)
+	}
+}
+
+// Simultaneous requests can't both take the last download.
+func TestDownloadLimitUnderConcurrency(t *testing.T) {
+	h := newHarness(t)
+	admin, _ := withAdmin(t, h)
+	admin.submit("/admin/rules", url.Values{"max_downloads": {"1"}})
+	slug := slugOf(h.upload("plan.pdf", 10, 3600))
+
+	// A link scanner looking with HEAD doesn't use the download up.
+	req := httptest.NewRequest("HEAD", "/l/"+slug, nil)
+	rec := httptest.NewRecorder()
+	h.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HEAD: %d", rec.Code)
+	}
+
+	const n = 20
+	codes := make(chan int, n)
+	var wg sync.WaitGroup
+	for range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rec := httptest.NewRecorder()
+			h.handler.ServeHTTP(rec, httptest.NewRequest("GET", "/l/"+slug, nil))
+			codes <- rec.Code
+		}()
+	}
+	wg.Wait()
+	close(codes)
+	served := 0
+	for c := range codes {
+		if c == http.StatusFound {
+			served++
+		} else if c != http.StatusGone {
+			t.Errorf("unexpected status %d", c)
+		}
+	}
+	if served != 1 {
+		t.Fatalf("a 1-download link was served %d times", served)
 	}
 }

@@ -74,6 +74,8 @@ func TestFileTypes(t *testing.T) {
 		".exe":            true, // only an ending, no name: not the blocked type
 		"exe":             true,
 		"archive.exe.txt": true,
+		"setup.exe.":      false, // Windows drops the trailing dot
+		"setup.exe . ":    false,
 	} {
 		err := blocked.CheckFile(name, 10)
 		if (err == nil) != ok {

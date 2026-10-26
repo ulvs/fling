@@ -95,7 +95,7 @@ func TestDeleteExpiredFilesOffOrDenied(t *testing.T) {
 
 func TestHumanDelay(t *testing.T) {
 	for d, want := range map[time.Duration]string{
-		24 * time.Hour: "a day", 72 * time.Hour: "3 days", time.Hour: "an hour", 6 * time.Hour: "6 hours", 30 * time.Minute: "30m0s",
+		24 * time.Hour: "a day", 72 * time.Hour: "3 days", time.Hour: "an hour", 6 * time.Hour: "6 hours", 30 * time.Minute: "30m0s", 90 * time.Minute: "1h30m0s",
 	} {
 		if got := humanDelay(d); got != want {
 			t.Errorf("%v: %q", d, got)
