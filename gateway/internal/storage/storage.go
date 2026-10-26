@@ -22,6 +22,9 @@ import (
 
 var ErrNotFound = errors.New("object not found")
 
+// ErrAccessDenied means the storage key may not do this, e.g. delete objects.
+var ErrAccessDenied = errors.New("access denied by the storage")
+
 // Objects is what the API needs from object storage.
 type Objects interface {
 	// PresignPut returns a URL and the headers the client must send with its PUT.
@@ -32,6 +35,8 @@ type Objects interface {
 	Size(ctx context.Context, key string) (int64, error)
 	// Ping checks that the bucket is reachable with the configured credentials.
 	Ping(ctx context.Context) error
+	// Delete removes an object. Deleting one that doesn't exist is not an error.
+	Delete(ctx context.Context, key string) error
 }
 
 type S3 struct {
@@ -101,6 +106,18 @@ func (s *S3) Size(ctx context.Context, key string) (int64, error) {
 		return 0, err
 	}
 	return aws.ToInt64(out.ContentLength), nil
+}
+
+func (s *S3) Delete(ctx context.Context, key string) error {
+	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
+	if err != nil {
+		var resp *smithyhttp.ResponseError
+		if errors.As(err, &resp) && resp.HTTPStatusCode() == http.StatusForbidden {
+			return ErrAccessDenied
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *S3) Ping(ctx context.Context) error {

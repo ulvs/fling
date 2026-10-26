@@ -6,7 +6,7 @@ An optional server an organisation hosts between Fling and its S3-compatible sto
 - A share link (`/l/…`) redirects to a five-minute presigned download, so turning a link off takes effect immediately.
 - Members sign in with Microsoft, Google, or any other OpenID Connect provider. They can also have **local accounts**, invited by an admin, using passkeys or passwords with optional two-step codes. Fling on Windows signs in through the browser and receives its own token.
 
-Status: sign-in (M2), local accounts with passkeys (M2b), the admin pages (M5) and organisation-wide rules (M4) work. Rules per group and large-file uploads come later.
+Status: sign-in (M2), local accounts with passkeys (M2b), the admin pages (M5), organisation-wide rules (M4) and the storage clean-up (M6) work. Rules per group and uploads over 5 GiB come later.
 
 ## Run it locally
 
@@ -79,10 +79,12 @@ Everything is set through environment variables.
 | `FLING_PUBLIC_URL` | required | The address people use, e.g. `https://fling.example.com`. Must be https, except for localhost. |
 | `FLING_LISTEN` | `:8080` | Listen address. |
 | `FLING_DATABASE_PATH` | `/data/fling-gateway.db` | SQLite database. Keep `/data` on a volume. |
-| `FLING_S3_ENDPOINT`, `FLING_S3_BUCKET`, `FLING_S3_ACCESS_KEY`, `FLING_S3_SECRET_KEY` | required | The storage. The key only needs to read and write objects in that bucket. |
+| `FLING_S3_ENDPOINT`, `FLING_S3_BUCKET`, `FLING_S3_ACCESS_KEY`, `FLING_S3_SECRET_KEY` | required | The storage. The key needs `s3:ListBucket` on the bucket, and `s3:PutObject`, `s3:GetObject` and `s3:DeleteObject` on its objects. Leave out `s3:DeleteObject` only if you turn the clean-up off. |
 | `FLING_S3_REGION` | `us-east-1` | |
 | `FLING_S3_PATH_STYLE` | `true` | Path-style addressing (MinIO, B2, R2). |
 | `FLING_DEFAULT_LINK_TTL`, `FLING_MAX_LINK_TTL` | `168h`, `720h` | How long links last, by default and at most. Admins can override these on the Rules page. |
+| `FLING_DELETE_EXPIRED_FILES` | `true` | Delete files from storage once nobody can download them: their link expired or was turned off, or the upload never finished. Turn it off if a bucket lifecycle rule does this instead. |
+| `FLING_DELETE_AFTER` | `24h` | How long after a link ends its file is deleted. |
 | `FLING_MAX_UPLOAD_BYTES` | `2147483648` | Largest upload (2 GiB), at most 5 GiB until uploads in parts arrive. Admins can override it on the Rules page. |
 | `FLING_MEMBER_EMAILS` | | Comma-separated addresses that may sign in. |
 | `FLING_MEMBER_DOMAINS` | | Comma-separated domains whose addresses may sign in, e.g. `example.com`. |

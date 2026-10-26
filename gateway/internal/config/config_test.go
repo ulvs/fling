@@ -34,6 +34,9 @@ func TestDefaults(t *testing.T) {
 	if cfg.Policy.DefaultTTL != 168*time.Hour || cfg.Policy.MaxTTL != 720*time.Hour {
 		t.Errorf("unexpected TTLs %v %v", cfg.Policy.DefaultTTL, cfg.Policy.MaxTTL)
 	}
+	if !cfg.Cleanup.Enabled || cfg.Cleanup.After != 24*time.Hour {
+		t.Errorf("cleanup defaults %+v", cfg.Cleanup)
+	}
 	if !cfg.S3.PathStyle || cfg.S3.Region != "us-east-1" || cfg.Listen != ":8080" {
 		t.Errorf("unexpected defaults %+v", cfg)
 	}

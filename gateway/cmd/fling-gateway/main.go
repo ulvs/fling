@@ -64,7 +64,7 @@ func run(log *slog.Logger) error {
 	if server.Local {
 		log.Info("local accounts on", "passkeys", true, "two_factor_required", cfg.RequireTwoFactor, "mail", cfg.Mail.Enabled())
 	}
-	go cleanup(ctx, log, db)
+	go cleanup(ctx, log, db, server)
 	httpServer := &http.Server{
 		Addr:              cfg.Listen,
 		Handler:           server.Handler(),
@@ -93,18 +93,37 @@ func run(log *slog.Logger) error {
 	return httpServer.Shutdown(shutdown)
 }
 
-// cleanup removes expired sessions and sign-ins in progress once an hour.
-func cleanup(ctx context.Context, log *slog.Logger, db *store.Store) {
+// cleanup runs once a minute after start and then every hour: it removes expired sessions and
+// sign-ins in progress, and deletes files nobody can download any more.
+func cleanup(ctx context.Context, log *slog.Logger, db *store.Store, server *api.Server) {
+	warnedDenied := false
+	run := func(now time.Time) {
+		if err := db.DeleteExpired(ctx, now); err != nil {
+			log.Warn("cleanup", "err", err)
+		}
+		_, err := server.DeleteExpiredFiles(ctx)
+		switch {
+		case errors.Is(err, storage.ErrAccessDenied):
+			if !warnedDenied {
+				warnedDenied = true
+				log.Warn("the storage key may not delete files, so expired files stay in the bucket: allow s3:DeleteObject, or set FLING_DELETE_EXPIRED_FILES=false and use a lifecycle rule")
+			}
+		case err != nil:
+			log.Warn("deleting expired files", "err", err)
+		}
+	}
+	first := time.NewTimer(time.Minute)
+	defer first.Stop()
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case now := <-first.C:
+			run(now)
 		case now := <-ticker.C:
-			if err := db.DeleteExpired(ctx, now); err != nil {
-				log.Warn("cleanup", "err", err)
-			}
+			run(now)
 		}
 	}
 }
@@ -140,6 +159,8 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger, db *sto
 		Local:            cfg.LocalAccounts,
 		RequireTwoFactor: cfg.RequireTwoFactor,
 		TrustedProxies:   cfg.TrustedProxies,
+		DeleteFiles:      cfg.Cleanup.Enabled,
+		DeleteAfter:      cfg.Cleanup.After,
 		DevToken:         cfg.DevToken,
 		DevUser:          devUser,
 	}

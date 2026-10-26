@@ -27,6 +27,13 @@ type Policy struct {
 	MaxUploadBytes int64
 }
 
+// Cleanup deletes files from storage once nobody can download them any more.
+type Cleanup struct {
+	Enabled bool
+	// After is how long after a file's last link ended (expired or turned off) it is deleted.
+	After time.Duration
+}
+
 // OIDCProvider is one sign-in provider. Google and Microsoft have fixed issuers; Generic
 // covers any other OpenID Connect provider (Okta, Keycloak, a local mock).
 type OIDCProvider struct {
@@ -51,6 +58,7 @@ type Config struct {
 	DatabasePath string
 	S3           S3
 	Policy       Policy
+	Cleanup      Cleanup
 
 	Google    OIDCProvider
 	Microsoft OIDCProvider
@@ -130,6 +138,10 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		Policy: Policy{
 			DefaultTTL: duration("FLING_DEFAULT_LINK_TTL", "168h"),
 			MaxTTL:     duration("FLING_MAX_LINK_TTL", "720h"),
+		},
+		Cleanup: Cleanup{
+			Enabled: boolean("FLING_DELETE_EXPIRED_FILES", true),
+			After:   duration("FLING_DELETE_AFTER", "24h"),
 		},
 		Google: OIDCProvider{
 			ClientID:     get("FLING_GOOGLE_CLIENT_ID", ""),

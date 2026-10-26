@@ -22,7 +22,18 @@ import (
 const testToken = "test-token-0123456789-0123456789-abcdef"
 
 type fakeObjects struct {
-	sizes map[string]int64 // key -> size, set by the test to simulate an upload
+	sizes   map[string]int64 // key -> size, set by the test to simulate an upload
+	deleted []string
+	deny    bool // Delete answers access denied, like a key without s3:DeleteObject
+}
+
+func (f *fakeObjects) Delete(_ context.Context, key string) error {
+	if f.deny {
+		return storage.ErrAccessDenied
+	}
+	delete(f.sizes, key)
+	f.deleted = append(f.deleted, key)
+	return nil
 }
 
 func (f *fakeObjects) PresignPut(_ context.Context, key, contentType string, size int64, _ time.Duration) (string, http.Header, error) {

@@ -47,6 +47,10 @@ type Server struct {
 	Admins    Members // FLING_ADMIN_EMAILS
 	OrgID     string
 
+	// Deleting files nobody can download any more (FLING_DELETE_EXPIRED_FILES, FLING_DELETE_AFTER).
+	DeleteFiles bool
+	DeleteAfter time.Duration
+
 	// Local accounts: invited users with passkeys, or passwords plus optional two-step codes.
 	Local            bool
 	RequireTwoFactor bool

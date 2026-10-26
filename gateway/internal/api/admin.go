@@ -40,6 +40,7 @@ type adminData struct {
 	Now        time.Time
 	PublicURL  string
 	AdminCount int
+	Cleanup    string // "a day" when files are deleted that long after their link ends; empty when off
 }
 
 // adminUser returns the signed-in admin, or answers the request itself.
@@ -62,6 +63,9 @@ func (s *Server) adminUser(w http.ResponseWriter, r *http.Request) (store.User, 
 
 func (s *Server) renderAdmin(w http.ResponseWriter, status int, name string, d adminData) {
 	d.Now, d.PublicURL = s.Now(), s.PublicURL
+	if s.DeleteFiles {
+		d.Cleanup = humanDelay(s.DeleteAfter)
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	if err := pages.ExecuteTemplate(w, name, d); err != nil {
@@ -427,7 +431,7 @@ const adminPages = `
 <button class="btn quiet" type="submit">Turn off</button></form>{{end}}</td>
 </tr>{{else}}<tr><td colspan="4">No links{{if .Search}} match "{{.Search}}"{{end}}.</td></tr>{{end}}</tbody>
 </table>
-<p class="small">Turning a link off stops it at once; the file stays in storage until it expires.</p>
+<p class="small">Turning a link off stops it at once. {{if .Cleanup}}The gateway deletes a file from storage {{.Cleanup}} after its link was turned off or expired.{{else}}Files stay in storage until a rule on the bucket removes them (the gateway's own clean-up is off).{{end}}</p>
 </main></body></html>{{end}}
 
 {{define "admin-activity"}}{{template "head" .}}<main class="wide admin">
